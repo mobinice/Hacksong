@@ -713,5 +713,5 @@
   functionHelp.mapping.intro='依已知欄位別名建議對應，再由使用者確認；本機版未串接 AI。';
   functionHelp.preview.steps=['逐列修正與取消匯入。','依識別碼或名稱與行政區歸戶。','確認年度與必要欄位。','確認後保存來源並重新計算，衝突需另外確認。'];
   document.querySelector('.topline .demo').textContent='本機原型 · 內建資料為合成示範';
-  page='data';render();$$('nav button').forEach(b=>b.classList.toggle('active',b.id==='nav-data'));
+  page='overview';render();$$('nav button').forEach(b=>b.classList.toggle('active',b.id==='nav-overview'));/* 登入後先看風險總覽（今天該優先關注誰），資料工作台從側欄進入 */
 })();
