@@ -5,7 +5,7 @@
   const dateLabel=y=>`${y} 年（${y+1911}）`;
   function entries(id){
     if(!db.evaluationFiles[id]){
-      db.evaluationFiles[id]=Number(id)<22?[
+      db.evaluationFiles[id]=!window.officialMode&&Number(id)<22?[
         {id:'demo-initial-'+id,year:115,date:'2026-03-18',title:'115 年度基本評鑑檢核表',result:'待改善',demo:true,fileName:'115年度基本評鑑檢核表_示範.txt',text:'【合成示範文件，非官方評鑑紀錄】\n115 年度基本評鑑檢核表\n園所：'+schoolById(id).name+'\n評鑑日期：2026-03-18\n評鑑結果：待改善\n示範待確認事項：設施設備維護紀錄未齊全。\n資料僅供原型操作展示。'},
         {id:'demo-followup-'+id,year:115,date:'2026-08-20',title:'115 年度改善追蹤紀錄',result:'符合',demo:true,fileName:'115年度改善追蹤紀錄_示範.txt',text:'【合成示範文件，非官方評鑑紀錄】\n115 年度改善追蹤紀錄\n園所：'+schoolById(id).name+'\n評鑑日期：2026-08-20\n評鑑結果：符合\n示範追蹤結果：已補齊設施設備維護紀錄。\n資料僅供原型操作展示。'},
         {id:'demo-previous-'+id,year:114,date:'2025-05-15',title:'114 年度基本評鑑檢核表',result:'符合',demo:true,fileName:'114年度基本評鑑檢核表_示範.txt',text:'【合成示範文件，非官方評鑑紀錄】\n114 年度基本評鑑檢核表\n園所：'+schoolById(id).name+'\n評鑑日期：2025-05-15\n評鑑結果：符合\n資料僅供原型操作展示。'}

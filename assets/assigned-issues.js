@@ -6,7 +6,7 @@
   db.ocrFindings ||= {};
   db.sentimentEvents ||= {};
   db.auditResults ||= {};
-  try{indexedDB.deleteDatabase('youan-evaluation-files')}catch{}
+  if(!window.officialMode){try{indexedDB.deleteDatabase('youan-evaluation-files')}catch{}}
 
   const stageNames={待處理:'待查核',調查中:'調查中',待補件:'待補件',已完成:'已結案'};
   const apiPost=async(path,payload)=>{
@@ -174,7 +174,7 @@
     viewer.showModal();
   };
 
-  if(!db.ocrFindings[0]?.length){
+  if(!window.officialMode&&!db.ocrFindings[0]?.length){
     const seeded=demoOcr('評鑑結果待改善。改善事項：生師比與人員編制資料待補齊；限期改善。','115年度基本評鑑檢核表_示範.txt');
     applyOcrFinding(0,'demo-initial-0',seeded);
   }
@@ -193,7 +193,7 @@
     const seen=new Set(),rows=[];
     for(const event of events){const key=normalize(event.title).slice(0,24)+'|'+event.date;if(seen.has(key))continue;seen.add(key);const score=Math.min(100,8+Object.entries(terms).reduce((n,[word,value])=>n+(`${event.title} ${event.excerpt}`.includes(word)?value:0),0));rows.push({...event,id:key,negativeScore:score,severity:score>=55?'高':score>=28?'中':'低',label:'未經查證之公開線索',aiSummary:`偵測到${score>=55?'高':score>=28?'中':'低'}度負向訊號，建議與正式陳情或查核紀錄交叉比對。`});}return rows.sort((a,b)=>b.date.localeCompare(a.date));
   };
-  for(const [id,items] of Object.entries(demoClues))if(!db.sentimentEvents[id])db.sentimentEvents[id]=localSentiment(items);
+  for(const [id,items] of Object.entries(demoClues))if(!window.officialMode&&!db.sentimentEvents[id])db.sentimentEvents[id]=localSentiment(items);
   Y.refreshSentiment=async id=>{
     const raw=demoClues[id]||db.sentimentEvents[id]||[];let result;
     try{result=await apiPost('/api/ai/sentiment',{events:raw})}catch{result={events:localSentiment(raw),provider:'瀏覽器內 Demo 情緒分析'}}

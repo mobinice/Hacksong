@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "retrievedAt": "2026-09-12T07:15:28+00:00",
+  "generatedAt": "2026-09-12T07:24:50+00:00",
+  "sourceSnapshots": {
+    "ntpc": {
+      "cachedAt": "2026-09-12T07:04:08+00:00"
+    },
+    "moe": {
+      "firstPageCachedAt": "2026-09-12T07:04:15+00:00",
+      "lastPageCachedAt": "2026-09-12T07:15:28+00:00"
+    }
+  },
+  "runStartedAt": "2026-09-12T07:23:32+00:00",
+  "registryCount": 1111,
+  "moeCount": 1099,
+  "schoolCount": 1122,
+  "reportDownloads": {
+    "downloaded": 3244
+  },
+  "partial": false,
+  "evaluationCount": 3320,
+  "reportsNotPublished": 76,
+  "sources": [
+    "https://data.ntpc.gov.tw/api/datasets/f563b4cd-b850-41f5-9709-b910f2d147e9/json",
+    "https://ap.ece.moe.edu.tw/webecems/evaSearch.aspx"
+  ],
+  "matching": {
+    "matched": 1088,
+    "moe_only": 11,
+    "unmatched": 23
+  },
+  "fieldDefinitions": {
+    "name": {
+      "label": "園所名稱",
+      "unit": null
+    },
+    "district": {
+      "label": "行政區",
+      "unit": null
+    },
+    "address": {
+      "label": "真實地址",
+      "unit": null
+    },
+    "type": {
+      "label": "設立別",
+      "unit": null
+    },
+    "serviceType": {
+      "label": "新北市資料集類型（含準公共）",
+      "unit": null
+    },
+    "telephone": {
+      "label": "電話",
+      "unit": null
+    },
+    "registrationNumber": {
+      "label": "立案字號",
+      "unit": null
+    },
+    "capacity": {
+      "label": "核定招生人數",
+      "unit": "人"
+    },
+    "studentCount": {
+      "label": "實際在園人數",
+      "unit": "人"
+    },
+    "monthlyFee": {
+      "label": "每生月費",
+      "unit": "新臺幣／生／月"
+    },
+    "evaluations": {
+      "label": "評鑑歷史紀錄",
+      "unit": null
+    }
+  },
+  "notice": "名錄與評鑑資料以行政區及標準化全名精確配對；未配對資料保留。空值不是 0 或安全認定。"
+}

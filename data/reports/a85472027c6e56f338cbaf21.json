@@ -1,0 +1,265 @@
+{
+  "schoolName": "新北市私立福祿貝爾大有幼兒園",
+  "sourceUrl": "https://ap.ece.moe.edu.tw/webecems/dtl/eva_view.aspx?tp=1&esid=MQA4AEQAcgBKADMANwBRACsAcABMAGYAeQBBADkAeABSAHMAegBBAFIAZgBCAHQANwBYAGIAdABKAFgATgBUAEQAUwBEAGoAeQBNAHUAMwBSADUAdQBUADcAVgBGAFgAbABWAFIAbwBPADEAagBsAGUATgB6AGIASABmAGYAUABDAHkAMwBZAEkASABoAG4AagBjAHUANQBYAFYAZwBXAGsAUABiAGEAYgB4AEQAcABCAHMAMQBXAHYAKwBuAFcAMAAwAE8AdQArAHUAMwB6AGoANwB3AD0A",
+  "retrievedAt": "2026-09-12T07:19:09+00:00",
+  "format": "html_table",
+  "tables": [
+    [
+      [
+        {
+          "text": "新北市私立福祿貝爾大有幼兒園 追蹤評鑑報告",
+          "rowSpan": 1,
+          "colSpan": 2,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "縣(市)別",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "新北市",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "評鑑日期",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "114 年 11 月 26 日",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "評鑑結果",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "全數指標通過追蹤評鑑",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ]
+    ],
+    [
+      [
+        {
+          "text": "壹、須辦理追蹤評鑑之指標及其檢核情形",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "類別",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "項目",
+          "rowSpan": 2,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "細項",
+          "rowSpan": 2,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "檢核情形",
+          "rowSpan": 1,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "備註",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "符合",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "不符合",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "3.教保活動課程",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "3.1",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "課程規劃與實施",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "3.1.1",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "每學期應至少召開一次全園性教保活動課程發展會議。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "3.1.2",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "各班課程應採統整不分科方式進行教學。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "5.餐飲與衛生管理",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "5.1",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "餐飲管理",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "5.1.6",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "經飲用水連續供水固定設備處理後之水質，每三個月至少檢測一次大腸桿菌群，水質符合標準並留有紀錄。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "貳、不符合項目及說明",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "無",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ]
+    ]
+  ],
+  "text": "評鑑檢視 新北市私立福祿貝爾大有幼兒園 追蹤評鑑報告 縣(市)別 新北市 評鑑日期 114 年 11 月 26 日 評鑑結果 全數指標通過追蹤評鑑 壹、須辦理追蹤評鑑之指標及其檢核情形 類別 項目 細項 檢核情形 備註 符合 不符合 3.教保活動課程 3.1 課程規劃與實施 3.1.1 每學期應至少召開一次全園性教保活動課程發展會議。 V 3.1.2 各班課程應採統整不分科方式進行教學。 V 5.餐飲與衛生管理 5.1 餐飲管理 5.1.6 經飲用水連續供水固定設備處理後之水質，每三個月至少檢測一次大腸桿菌群，水質符合標準並留有紀錄。 V 貳、不符合項目及說明 無"
+}

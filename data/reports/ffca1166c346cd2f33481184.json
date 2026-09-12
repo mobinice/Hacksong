@@ -1,0 +1,291 @@
+{
+  "schoolName": "新北市私立心慈幼兒園",
+  "sourceUrl": "https://ap.ece.moe.edu.tw/webecems/dtl/eva_view.aspx?tp=1&esid=RgBOAGwATwAwAHMASgB4AHIAbwBEAFMATgBYAHYAYgBNAEsAdABsAFgAbQBaAEEAYgBCAGMAeQAvAGYATgBKAFcAYgBmAGYAagBKAFAAbABqAHMAQwBPAGwAZwA5AEwAeQBqAEkAbAByAFMASQBoAC8AVQBDADkAcQBUAGQAUQAyAGYAMgBFAGgAaAAzAEUAMwBMAHoAOAB1AGIARAA1ADYATgBvADkAUwByAHUANQBVAGYAYwBEADUAOQB2AGkANABmADkAbwBNAHoAOQA0AEIAdQAwAD0A",
+  "retrievedAt": "2026-09-12T07:20:17+00:00",
+  "format": "html_table",
+  "tables": [
+    [
+      [
+        {
+          "text": "新北市私立心慈幼兒園 追蹤評鑑報告",
+          "rowSpan": 1,
+          "colSpan": 2,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "縣(市)別",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "新北市",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "評鑑日期",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "103 年 11 月 19 日",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "評鑑結果",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "全數指標通過追蹤評鑑",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ]
+    ],
+    [
+      [
+        {
+          "text": "壹、須辦理追蹤評鑑之指標及其檢核情形",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "類別",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "項目",
+          "rowSpan": 2,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "細項",
+          "rowSpan": 2,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "檢核情形",
+          "rowSpan": 1,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "備註",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "符合",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "不符合",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "5.餐飲與衛生管理",
+          "rowSpan": 4,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "5.1",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "餐飲管理",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "5.1.5",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "飲用水連續供水固定設備每個月至少維護一次，並留有紀錄。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "5.1.6",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "經飲用水連續供水固定設備處理後之水質，每三個月至少檢測一次大腸桿菌群，並留有紀錄。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "5.2",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "衛生保健",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "5.2.2",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "男、女廁應分別設置；若未分別設置，則應有隔間設計。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "5.2.4",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "有建立幼兒託藥措施，並告知家長。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "貳、不符合項目及說明",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "無",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ]
+    ]
+  ],
+  "text": "評鑑檢視 新北市私立心慈幼兒園 追蹤評鑑報告 縣(市)別 新北市 評鑑日期 103 年 11 月 19 日 評鑑結果 全數指標通過追蹤評鑑 壹、須辦理追蹤評鑑之指標及其檢核情形 類別 項目 細項 檢核情形 備註 符合 不符合 5.餐飲與衛生管理 5.1 餐飲管理 5.1.5 飲用水連續供水固定設備每個月至少維護一次，並留有紀錄。 V 5.1.6 經飲用水連續供水固定設備處理後之水質，每三個月至少檢測一次大腸桿菌群，並留有紀錄。 V 5.2 衛生保健 5.2.2 男、女廁應分別設置；若未分別設置，則應有隔間設計。 V 5.2.4 有建立幼兒託藥措施，並告知家長。 V 貳、不符合項目及說明 無"
+}

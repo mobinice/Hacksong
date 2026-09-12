@@ -3,6 +3,7 @@
    內建 22 間示範園所仍保留，供規則引擎、資料工作台、查核流程等展示使用；
    API 不可用時自動停留在示範資料，畫面不會空白。 */
 (function(){
+  if(window.officialMode)return;
   const API='/api/schools';
   let real=[],mode='demo';
   const DIMS=[['compliance','法遵／裁罰／評鑑'],['finance','財務／收費'],['consistency','資料一致性'],['sentiment','輿情預警']];

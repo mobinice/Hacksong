@@ -1,0 +1,321 @@
+{
+  "schoolName": "新北市私立菲力中興幼兒園",
+  "sourceUrl": "https://ap.ece.moe.edu.tw/webecems/dtl/eva_view.aspx?tp=1&esid=VQBPADIAKwA5ADkATQAxAFkAZwBVAGUAcQBIAHIAYgBsAG4AcwBYACsANABHAGYAagBoADgAZABQAEwASgBhADgAdQBUAFQAdwBjAFMAMABlAHoAdgB1AHQAcwBRADcARgA0AHoAZABMAHgATgBEAGgAbwAzAHYAdwArAEsANABEAGkANABIAFkAUQBYAGwAbQA1ADcAMABwAHgAdgBSADIAZwBYADEAagBlAFoAawA0AFAAaQB2AE0ATgB5ADcAVABiAG4AUQB4AHYANQBHAHAAMQBJAD0A",
+  "retrievedAt": "2026-09-12T07:17:03+00:00",
+  "format": "html_table",
+  "tables": [
+    [
+      [
+        {
+          "text": "新北市私立菲力中興幼兒園 追蹤評鑑報告",
+          "rowSpan": 1,
+          "colSpan": 2,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "縣(市)別",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "新北市",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "評鑑日期",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "106 年 11 月 21 日",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "評鑑結果",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "部分指標通過追蹤評鑑（符合 2 項、不符合 1 項）",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ]
+    ],
+    [
+      [
+        {
+          "text": "壹、須辦理追蹤評鑑之指標及其檢核情形",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "類別",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "項目",
+          "rowSpan": 2,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "細項",
+          "rowSpan": 2,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "檢核情形",
+          "rowSpan": 1,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "備註",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "符合",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "不符合",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "5.餐飲與衛生管理",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "5.1",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "餐飲管理",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "5.1.1",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "有公布每個月餐點表，並告知家長。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "5.2",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "衛生保健",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "5.2.2",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "男、女廁應分別設置；若未分別設置，則應有隔間設計。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "6.安全管理",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "6.2",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "場地安全",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "6.2.1",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "有辦理消防安全設備檢修申報，查核合格且在有效期限。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "貳、不符合項目及說明",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "類別",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "項目",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "細項",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "不符合情形說明",
+          "rowSpan": 1,
+          "colSpan": 5,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "5.餐飲與衛生管理",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "5.2",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "5.2.2",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "男、女廁未分別設置，隔間設計不符合規定。",
+          "rowSpan": 1,
+          "colSpan": 5,
+          "header": false
+        }
+      ]
+    ]
+  ],
+  "text": "評鑑檢視 新北市私立菲力中興幼兒園 追蹤評鑑報告 縣(市)別 新北市 評鑑日期 106 年 11 月 21 日 評鑑結果 部分指標通過追蹤評鑑（符合 2 項、不符合 1 項） 壹、須辦理追蹤評鑑之指標及其檢核情形 類別 項目 細項 檢核情形 備註 符合 不符合 5.餐飲與衛生管理 5.1 餐飲管理 5.1.1 有公布每個月餐點表，並告知家長。 V 5.2 衛生保健 5.2.2 男、女廁應分別設置；若未分別設置，則應有隔間設計。 V 6.安全管理 6.2 場地安全 6.2.1 有辦理消防安全設備檢修申報，查核合格且在有效期限。 V 貳、不符合項目及說明 類別 項目 細項 不符合情形說明 5.餐飲與衛生管理 5.2 5.2.2 男、女廁未分別設置，隔間設計不符合規定。"
+}

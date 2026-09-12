@@ -1,0 +1,227 @@
+{
+  "schoolName": "新北市私立高登幼兒園",
+  "sourceUrl": "https://ap.ece.moe.edu.tw/webecems/dtl/eva_view.aspx?tp=1&esid=dgA0AHEATgBZAHIAKwAxAGcARwBNADEANQBSAEEARABsADEASgB3AE4ATwAyAEIARABWAHYATABnAGUANABRAC8AWQBmAEcAagBjAEUAZgBrAEsAcQB1AGMAcQBGACsAWABKAFkAVwBLAEMAYwBKADUAYgBxAHUANwBTAGIATgBnAEMAcAA4AEMAdABmAFcAMQBSAGYAaQA1AFYAYwBEAEoALwBXAHMAMQBSAHkASAAyAHAAWgA1AHoAOQBmAEQAdgBhAFgAdABiAEMAUgBNAGoAWQBnAD0A",
+  "retrievedAt": "2026-09-12T07:18:27+00:00",
+  "format": "html_table",
+  "tables": [
+    [
+      [
+        {
+          "text": "新北市私立高登幼兒園 追蹤評鑑報告",
+          "rowSpan": 1,
+          "colSpan": 2,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "縣(市)別",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "新北市",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "評鑑日期",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "112 年 11 月 23 日",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "評鑑結果",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "全數指標通過追蹤評鑑",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ]
+    ],
+    [
+      [
+        {
+          "text": "壹、須辦理追蹤評鑑之指標及其檢核情形",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "類別",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "項目",
+          "rowSpan": 2,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "細項",
+          "rowSpan": 2,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "檢核情形",
+          "rowSpan": 1,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "備註",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "符合",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "不符合",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "3.教保活動課程",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "3.1",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "課程規劃",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "3.1.1",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "每學期應至少召開一次全園性教保活動課程發展會議。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "3.3",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "活動室環境",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "3.3.1",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "活動室之桌面照度應至少三百五十勒克斯(lux)以上，黑板照度應至少五百勒克斯(lux)以上。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "貳、不符合項目及說明",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "無",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ]
+    ]
+  ],
+  "text": "評鑑檢視 新北市私立高登幼兒園 追蹤評鑑報告 縣(市)別 新北市 評鑑日期 112 年 11 月 23 日 評鑑結果 全數指標通過追蹤評鑑 壹、須辦理追蹤評鑑之指標及其檢核情形 類別 項目 細項 檢核情形 備註 符合 不符合 3.教保活動課程 3.1 課程規劃 3.1.1 每學期應至少召開一次全園性教保活動課程發展會議。 V 3.3 活動室環境 3.3.1 活動室之桌面照度應至少三百五十勒克斯(lux)以上，黑板照度應至少五百勒克斯(lux)以上。 V 貳、不符合項目及說明 無"
+}

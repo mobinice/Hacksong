@@ -1,0 +1,277 @@
+{
+  "schoolName": "新北市私立大崁璽恩幼兒園",
+  "sourceUrl": "https://ap.ece.moe.edu.tw/webecems/dtl/eva_view.aspx?tp=1&esid=dQBGAEQAZABxAGcATgBhAC8AKwBnAEMAVABVAGkASAAzADgARQBxAG8AbgBPADYANgBXAHUAZwB3ACsAZAB4AGoAcgBGAGkAdABLAG0AUwBvADAAawBnAFIAZQBOAEcAUQB0AFgAUwBoADUAbQBlAGQAWgBlAGcAcABQADQAcQBhAHcAcQBkAE4AVgAzAC8AbQBKAFkAWgBJAHcAegBaADgAZgBFADAAUgAyAEoAcwBZAGcAYgAyAFMAQQBRAC8AUgBkAEoAdQBEAFcAcgBFAEsAUQBVAD0A",
+  "retrievedAt": "2026-09-12T07:21:44+00:00",
+  "format": "html_table",
+  "tables": [
+    [
+      [
+        {
+          "text": "新北市私立大崁璽恩幼兒園 追蹤評鑑報告",
+          "rowSpan": 1,
+          "colSpan": 2,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "縣(市)別",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "新北市",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "評鑑日期",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "103 年 11 月 21 日",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "評鑑結果",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "全數指標通過追蹤評鑑",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ]
+    ],
+    [
+      [
+        {
+          "text": "壹、須辦理追蹤評鑑之指標及其檢核情形",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "類別",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "項目",
+          "rowSpan": 2,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "細項",
+          "rowSpan": 2,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "檢核情形",
+          "rowSpan": 1,
+          "colSpan": 2,
+          "header": false
+        },
+        {
+          "text": "備註",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "符合",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "不符合",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "4.人事管理",
+          "rowSpan": 2,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "4.2",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "員工保險",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "4.2.1",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "教職員工均應辦理保險(勞保包括職災或公保、健保)，且保費依規定分攤，投保薪資未有低報情形。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "4.3",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "退休制度",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "4.3.1",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "有依規定提繳勞工退休準備金。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "6.安全管理",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "6.2",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "場地安全",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "6.2.3",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "設置於二樓或三樓露臺之室外活動空間及園內樓梯扶手，其欄杆間距不得大於十公分，且不得設置橫條。",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "V",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        },
+        {
+          "text": "",
+          "rowSpan": 1,
+          "colSpan": 1,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "貳、不符合項目及說明",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ],
+      [
+        {
+          "text": "無",
+          "rowSpan": 1,
+          "colSpan": 8,
+          "header": false
+        }
+      ]
+    ]
+  ],
+  "text": "評鑑檢視 新北市私立大崁璽恩幼兒園 追蹤評鑑報告 縣(市)別 新北市 評鑑日期 103 年 11 月 21 日 評鑑結果 全數指標通過追蹤評鑑 壹、須辦理追蹤評鑑之指標及其檢核情形 類別 項目 細項 檢核情形 備註 符合 不符合 4.人事管理 4.2 員工保險 4.2.1 教職員工均應辦理保險(勞保包括職災或公保、健保)，且保費依規定分攤，投保薪資未有低報情形。 V 4.3 退休制度 4.3.1 有依規定提繳勞工退休準備金。 V 6.安全管理 6.2 場地安全 6.2.3 設置於二樓或三樓露臺之室外活動空間及園內樓梯扶手，其欄杆間距不得大於十公分，且不得設置橫條。 V 貳、不符合項目及說明 無"
+}

@@ -43,7 +43,9 @@ def load_dotenv(path: Path | None = None) -> None:
 
 load_dotenv()
 
-from scripts.crawl_moe import create_session, enrich_risk_metrics, fetch_district_schools
+from scripts.crawl_moe import create_session, enrich_risk_metrics, fetch_district_schools, query_schools
+from scripts.workspace_data import load_workspace_schools
+from scripts.official_risk import recalculate_all_schools as official_risks
 from scripts.risk_engine import DEFAULT_RULES, DEFAULT_THRESHOLDS, recalculate_all_schools
 from scripts.storage_db import get_state, get_stats, init_db, reset_db, save_state
 
@@ -450,6 +452,7 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+        official = urllib.parse.parse_qs(parsed.query).get("workspace") == ["official"]
         if path.startswith("/api/") and not self._allow_request():
             return
         if path == "/api/health":
@@ -466,6 +469,12 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 },
             )
             return
+        if path == "/api/workspace":
+            try:
+                self._json(200, {"schools": load_workspace_schools()})
+            except (OSError, ValueError):
+                self._json(503, {"message": "官方資料快照暫時無法讀取"})
+            return
         if path == "/api/schools":
             mode = urllib.parse.parse_qs(parsed.query).get("mode", ["real"])[0]
             if mode != "real":
@@ -474,6 +483,14 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
             file_path = BASE_DIR / "data" / "real_schools.json"
             try:
                 data = json.loads(file_path.read_text(encoding="utf-8")) if file_path.exists() else []
+                query = urllib.parse.parse_qs(parsed.query)
+                # Preserve the original array contract for map and existing clients.
+                if any(k in query for k in ("page", "size", "q", "district", "type")) and query.get("format") != ["legacy"]:
+                    try:
+                        data = query_schools(data, query)
+                    except (ValueError, TypeError):
+                        self._json(400, {"message": "分頁或篩選參數無效"})
+                        return
                 self._json(200, data)
             except (OSError, json.JSONDecodeError):
                 self._json(500, {"status": "error", "message": "資料檔暫時無法讀取"})
@@ -490,7 +507,7 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
             return
         if path == "/api/storage/state":
             try:
-                state = get_state()
+                state = get_state(state_key="ntpc_official") if official else get_state()
                 self._json(
                     200,
                     {
@@ -512,14 +529,14 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
             return
         if path in {"/api/risk/schools", "/api/risk/rules"}:
             try:
-                state = get_state()
+                state = get_state(state_key="ntpc_official") if official else get_state()
                 state_data = state.get("data") or {}
                 rules = state_data.get("rules", DEFAULT_RULES)
                 thresholds = state_data.get("thresholds", DEFAULT_THRESHOLDS)
                 if path == "/api/risk/rules":
                     self._json(200, {"status": "success", "rules": rules, "thresholds": thresholds})
                     return
-                result = recalculate_all_schools(demo_schools(), rules, thresholds)
+                result = official_risks(load_workspace_schools(state_data), rules, thresholds) if official else recalculate_all_schools(demo_schools(), rules, thresholds)
                 self._json(
                     200,
                     {
@@ -537,7 +554,9 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self) -> None:
-        path = urllib.parse.urlparse(self.path).path
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        official = urllib.parse.parse_qs(parsed.query).get("workspace") == ["official"]
         if not self._allow_request():
             return
         payload = self._read_json()
@@ -591,11 +610,15 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 self._json(400, {"status": "error", "message": "db 必須是物件"})
                 return
             try:
-                current = get_state().get("data") or {}
+                current = (get_state(state_key="ntpc_official") if official else get_state()).get("data") or {}
                 state = {**current, **incoming} if isinstance(current, dict) else incoming
                 if isinstance(current, dict) and isinstance(current.get("reviews"), dict) and isinstance(incoming.get("reviews"), dict):
                     state["reviews"] = {**current["reviews"], **incoming["reviews"]}
-                save_state(state)
+                if official:
+                    state["workspace"] = "ntpc-official-v1"
+                    save_state(state, state_key="ntpc_official")
+                else:
+                    save_state(state)
                 backend = get_stats().get("backend", "database")
                 self._json(200, {"status": "success", "backend": backend, "message": f"狀態已儲存至 {backend}"})
             except Exception:
@@ -603,7 +626,10 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
             return
         if path == "/api/storage/reset":
             try:
-                reset_db()
+                if official:
+                    reset_db(state_key="ntpc_official")
+                else:
+                    reset_db()
                 backend = get_stats().get("backend", "database")
                 self._json(200, {"status": "success", "backend": backend, "message": f"{backend} Demo 狀態已清除"})
             except Exception:
@@ -616,7 +642,8 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 self._json(400, {"status": "error", "message": "rules 與 thresholds 格式錯誤"})
                 return
             try:
-                result = recalculate_all_schools(demo_schools(), rules, thresholds)
+                state_data = (get_state(state_key="ntpc_official").get("data") or {}) if official else {}
+                result = official_risks(load_workspace_schools(state_data), rules, thresholds) if official else recalculate_all_schools(demo_schools(), rules, thresholds)
                 self._json(
                     200,
                     {
@@ -642,7 +669,7 @@ class ThreadingServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 def run_server() -> None:
     os.chdir(BASE_DIR)
-    with ThreadingServer(("", PORT), RadarAPIHandler) as server:
+    with ThreadingServer((os.environ.get("HOST", ""), PORT), RadarAPIHandler) as server:
         print(f"📡 幼安雷達 Demo API：http://127.0.0.1:{PORT}/preview.html")
         try:
             server.serve_forever()
