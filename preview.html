@@ -26,15 +26,18 @@ function options(values,value,firstEmpty=false){return values.map((s,i)=>`<optio
 let bedrockLoading=false;
 async function generateBedrockAdvice(id,force=false){
   if(bedrockLoading)return;
-  const s=schools[id];if(!s)return;
+  const s=(typeof schoolById==='function'?schoolById(id):null)||schools[id];if(!s)return;
   db.bedrockAdvice||={};
   if(!force&&db.bedrockAdvice[id]){detail();return;}
   bedrockLoading=true;detail();
   try{
+    const ast = typeof assessment==='function'?assessment(s):null;
+    const reasonsList = (ast&&ast.rows.filter(r=>r.hit).length)?ast.rows.filter(r=>r.hit).map(r=>({title:r.name,summary:r.action,observation:r.formula})):reasons(s);
+    const scoreVal = ast ? ast.score : s.score;
     const res=await fetch('/api/bedrock/audit-advice',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({schoolId:s.id,schoolName:s.name,district:s.district,type:s.type,capacity:s.capacity,riskScore:s.score,riskReasons:reasons(s)})
+      body:JSON.stringify({schoolId:s.id,schoolName:s.name,district:s.district,type:s.type,capacity:s.capacity,riskScore:scoreVal,riskReasons:reasonsList})
     });
     if(!res.ok)throw Error('HTTP '+res.status);
     const data=await res.json();
