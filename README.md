@@ -16,6 +16,9 @@ python -m http.server 8765 --bind 127.0.0.1
 
 - `preview.html`：原型入口。
 - `assets/`：JavaScript、CSS、PDF / Excel 處理依賴與授權文件，請完整保留。
+- `assets/vendor/leaflet/`：Leaflet 1.9.4（BSD-2-Clause）地圖套件，本機載入不走 CDN。
+- `assets/ntpc-districts.js`：新北市 29 個行政區界 GeoJSON（WGS84），來源為內政部鄉鎮市區界（經 g0v/twgeojson 整理、mapshaper 簡化），供地圖聚焦與快速縮放。
+- `assets/logo-team.png`：登入畫面用的隊伍標誌縮圖，原檔在 `design/logos/`。
 - `docs/presentations/`：原始提案 PPTX、PDF，以及隊伍資訊版 PPTX。PDF 對應原始版，不是隊伍資訊版的輸出。
 - `docs/architecture/`：功能爆炸圖的 Mermaid 原始檔、SVG 與 PNG。
 - `docs/competition/`：主辦單位服務清單與環境規範。
@@ -24,6 +27,8 @@ python -m http.server 8765 --bind 127.0.0.1
 
 ## 目前功能與限制
 
+- 登入畫面為展示模式：輸入任意帳號與密碼即可進入，僅保存在瀏覽器 sessionStorage，未串接真實身分驗證。
+- 風險總覽地圖使用 Leaflet 與 OpenStreetMap 圖磚（需要網路才能顯示底圖），園所以 WGS84 經緯度標記並依風險等級上色；可用行政區按鈕或篩選快速縮放，點標記開啟摘要卡片。內建園所座標為示範資料，落在對應行政區內但不是真實園所位置。
 - 園所資料工作台、欄位選擇與 Excel 匯出。
 - 每生人事成本＝同年度人事費 ÷ 實際學生數；缺值、衝突或學生數為 0 時不計算。
 - 規則權重設定、分數計算與來源證據。啟用權重合計 100%，裁罰按次累加，累計風險分數可超過 100。
