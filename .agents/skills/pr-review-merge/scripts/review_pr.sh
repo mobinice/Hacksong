@@ -42,7 +42,7 @@ PATTERNS=(
 
 for pattern in "${PATTERNS[@]}"; do
   # Filter out patterns in comments or security checklist files
-  MATCHES=$(echo "$ADDED_LINES" | grep -E "$pattern" | grep -v "pattern in" | grep -v "checklist" || true)
+  MATCHES=$(echo "$ADDED_LINES" | grep -E -e "$pattern" | grep -v "pattern in" | grep -v "checklist" || true)
   if [ -n "$MATCHES" ]; then
     echo "⚠️ ALERT: Potential secret detected matching pattern: $pattern"
     echo "$MATCHES" | head -n 3
