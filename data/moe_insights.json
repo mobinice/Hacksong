@@ -1,0 +1,39 @@
+{
+  "summary": {
+    "totalInstitutions": 110,
+    "evaluatedInstitutions": 108,
+    "unevaluatedInstitutions": 2,
+    "passRate": 99.1,
+    "issueRate": 12.0
+  },
+  "breakdown": {
+    "allIndicatorsPassed": 107,
+    "partialIndicatorsPassed": 7,
+    "followupEvaluationNeeded": 6,
+    "noEvaluationRecorded": 2,
+    "publicCount": 97,
+    "privateCount": 13,
+    "nonprofitCount": 0
+  },
+  "keyFindings": [
+    {
+      "title": "私立機構評鑑缺失風險比率顯著較高",
+      "desc": "在已受評的私立幼兒園中，有缺失或需追蹤評鑑的比例達 7.7%，相比公立幼兒園的 6.2% 高出許多，建議外勤有限人力應優先配置於私立大型機構。"
+    },
+    {
+      "title": "「尚未接受評鑑」機構構成實質監控盲區",
+      "desc": "本次轄區清查發現有 2 間園所教育部資料庫標記「尚未接受評鑑」。若系統僅以『無違規』視同『低風險』，將導致新設園所長期處於監管真空。幼安雷達自動將其歸類為【資料不足待補件】，有效杜絕稽查死角。"
+    },
+    {
+      "title": "評鑑結果與學童規模加權效應",
+      "desc": "部分指標通過之機構平均核定人數達 145 人以上，單一園所之環境或師生比缺失可能影響百名幼童家庭，AI 風險引擎已針對規模進行加權提升查核優先序。"
+    }
+  ],
+  "districts": {
+    "板橋區": 30,
+    "三重區": 20,
+    "中和區": 20,
+    "新莊區": 20,
+    "淡水區": 20
+  }
+}
