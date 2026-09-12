@@ -22,7 +22,7 @@
 
   <text x="95" y="174" class="lane">01｜資料來源</text>
   <text x="455" y="174" class="lane">02｜文件儲存與 AI 處理</text>
-  <text x="890" y="174" class="lane">03｜EC2 應用與關聯式資料</text>
+  <text x="890" y="174" class="lane">03｜EC2 應用＋RDS 關聯資料</text>
   <text x="1450" y="174" class="lane">04｜承辦人工作介面</text>
 
   <!-- source cards -->
@@ -59,9 +59,9 @@
     <rect class="card" x="455" y="692" width="340" height="52" rx="14"/><text x="625" y="724" text-anchor="middle" class="strong">批次匯入／人工確認後送入應用層</text>
   </g>
 
-  <!-- EC2 application and relational store -->
+  <!-- EC2 application and Amazon RDS relational store -->
   <g>
-    <rect x="875" y="205" width="475" height="539" rx="25" fill="#e7f0f6" stroke="#afc7da" stroke-width="2"/>
+    <rect x="875" y="205" width="475" height="427" rx="25" fill="#e7f0f6" stroke="#afc7da" stroke-width="2"/>
     <rect x="875" y="205" width="475" height="66" rx="25" fill="#24395b"/><path d="M875 245h475v26H875z" fill="#24395b"/>
     <rect x="900" y="225" width="84" height="27" rx="13" fill="#ff9900"/><text x="942" y="243" text-anchor="middle" class="tag">AWS EC2</text>
     <text x="1004" y="244" class="service" style="font-size:20px">單一應用主機｜Hackathon MVP</text>
@@ -80,10 +80,10 @@
     <text x="922" y="592" class="serviceSub">跨來源比對 · 歷史趨勢 · 構面權重 · Evidence</text>
     <text x="922" y="616" class="serviceSub">輸出分數、公式、原始依據與查核建議</text>
 
-    <rect class="card" x="900" y="656" width="425" height="68" rx="16"/>
-    <rect x="922" y="676" width="78" height="27" rx="13" fill="#2368a0"/><text x="961" y="694" text-anchor="middle" class="tag">SQLITE</text>
-    <text x="1020" y="694" class="h">關聯資料庫｜加密 EBS</text>
-    <text x="1020" y="716" class="p">園所 · 年度資料 · 文件 · 規則 · 結果 · 案件</text>
+    <rect class="card" x="900" y="656" width="425" height="68" rx="16" stroke="#79a9cf" stroke-width="2"/>
+    <rect x="922" y="676" width="112" height="27" rx="13" fill="#2368a0"/><text x="978" y="694" text-anchor="middle" class="tag">AMAZON RDS</text>
+    <text x="1054" y="694" class="h">PostgreSQL 關聯資料庫</text>
+    <text x="1054" y="716" class="p">託管服務 · 加密儲存 · 自動備份</text>
   </g>
 
   <!-- user experience -->
@@ -124,12 +124,12 @@
   <text x="121" y="842" class="lane">安全、持久化與維運基礎</text>
   <g transform="translate(121 866)">
     <rect x="0" y="0" width="292" height="67" rx="13" fill="#fff"/><circle cx="30" cy="34" r="16" fill="#fff0d7"/><text x="30" y="39" text-anchor="middle" class="strong">S</text><text x="57" y="29" class="strong">S3 Private＋KMS</text><text x="57" y="50" class="small">原始文件不公開、靜態加密</text>
-    <rect x="316" y="0" width="292" height="67" rx="13" fill="#fff"/><circle cx="346" cy="34" r="16" fill="#eaf1ff"/><text x="346" y="39" text-anchor="middle" class="strong">D</text><text x="373" y="29" class="strong">EBS＋SQLite 備份</text><text x="373" y="50" class="small">持久磁碟、快照與 S3 備份</text>
+    <rect x="316" y="0" width="292" height="67" rx="13" fill="#fff"/><circle cx="346" cy="34" r="16" fill="#eaf1ff"/><text x="346" y="39" text-anchor="middle" class="strong">R</text><text x="373" y="29" class="strong">Amazon RDS</text><text x="373" y="50" class="small">自動備份、快照與可選 Multi-AZ</text>
     <rect x="632" y="0" width="292" height="67" rx="13" fill="#fff"/><circle cx="662" cy="34" r="16" fill="#e9edff"/><text x="662" y="39" text-anchor="middle" class="strong">I</text><text x="689" y="29" class="strong">IAM EC2 Role</text><text x="689" y="50" class="small">僅允許必要的 AWS 服務</text>
     <rect x="948" y="0" width="292" height="67" rx="13" fill="#fff"/><circle cx="978" cy="34" r="16" fill="#e5f7ed"/><text x="978" y="39" text-anchor="middle" class="strong">C</text><text x="1005" y="29" class="strong">CloudWatch</text><text x="1005" y="50" class="small">API 日誌、錯誤與資源監控</text>
     <rect x="1264" y="0" width="321" height="67" rx="13" fill="#fff"/><circle cx="1294" cy="34" r="16" fill="#feecee"/><text x="1294" y="39" text-anchor="middle" class="strong">E</text><text x="1321" y="29" class="strong">Evidence First</text><text x="1321" y="50" class="small">原文可追溯、結果由人工確認</text>
   </g>
 
-  <text x="96" y="1020" class="note">MVP：單台 EC2＋SQLite 降低開發複雜度；若未來需要多機、高併發寫入或高可用，再遷移至 PostgreSQL／RDS。</text>
+  <text x="96" y="1020" class="note">MVP：EC2 承載網站與 API，Amazon RDS（PostgreSQL）集中管理關聯資料；未來可依需求啟用 Multi-AZ 與 Read Replica。</text>
   <text x="1824" y="1020" text-anchor="end" class="note">幼安雷達 · Bug 不過夜</text>
 </svg>
