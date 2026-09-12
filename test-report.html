@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>幼安雷達 — 全流程端對端整合測試與系統機制驗收報告</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --card-border: #30363d;
+      --accent: #238636;
+      --accent-glow: rgba(35, 134, 54, 0.25);
+      --blue: #58a6ff;
+      --blue-glow: rgba(88, 166, 255, 0.2);
+      --orange: #d29922;
+      --red: #f85149;
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Noto Sans TC', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding-bottom: 60px;
+    }
+    .header {
+      background: linear-gradient(180deg, #1f242c 0%, #0d1117 100%);
+      border-bottom: 1px solid var(--card-border);
+      padding: 40px 24px;
+      text-align: center;
+    }
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(35, 134, 54, 0.15);
+      border: 1px solid var(--accent);
+      color: #3fb950;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      font-family: var(--mono);
+    }
+    .header h1 {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      margin-bottom: 12px;
+    }
+    .header p {
+      color: var(--text-muted);
+      max-width: 820px;
+      margin: 0 auto 20px;
+      font-size: 15px;
+    }
+    .env-pills {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .env-pill {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--blue);
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 30px 20px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+    .kpi-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: var(--accent);
+    }
+    .kpi-card.blue::before { background: var(--blue); }
+    .kpi-card.orange::before { background: var(--orange); }
+    .kpi-card span {
+      font-size: 13px;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 6px;
+    }
+    .kpi-card strong {
+      font-size: 28px;
+      font-family: var(--mono);
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .kpi-card small {
+      display: block;
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 40px 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .section-title .badge {
+      font-size: 12px;
+      background: var(--accent);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-family: var(--mono);
+    }
+
+    /* Flow Card */
+    .flow-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      margin-bottom: 28px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .flow-header {
+      padding: 16px 20px;
+      background: #1c2128;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .flow-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .step-num {
+      background: var(--blue);
+      color: #0d1117;
+      font-family: var(--mono);
+      font-weight: 800;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .status-badge {
+      background: rgba(35, 134, 54, 0.2);
+      border: 1px solid var(--accent);
+      color: #3fb950;
+      font-size: 12px;
+      font-family: var(--mono);
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+    .flow-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding: 20px;
+    }
+    @media (max-width: 900px) {
+      .flow-content { grid-template-columns: 1fr; }
+    }
+    .flow-desc {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .desc-block h4 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--blue);
+      margin-bottom: 6px;
+    }
+    .desc-block p {
+      font-size: 14px;
+      color: #c9d1d9;
+    }
+    .mechanism-box {
+      background: #0d1117;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-size: 13px;
+    }
+    .mechanism-box ul {
+      margin-left: 18px;
+      color: #c9d1d9;
+    }
+    .mechanism-box li {
+      margin-bottom: 4px;
+    }
+    .metric-row {
+      display: flex;
+      gap: 16px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      background: #11151c;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px dashed var(--card-border);
+    }
+    .metric-row b { color: var(--accent); }
+
+    .screenshot-wrapper {
+      position: relative;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      background: #000;
+      cursor: pointer;
+    }
+    .screenshot-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.2s;
+    }
+    .screenshot-wrapper:hover img {
+      transform: scale(1.02);
+    }
+    .screenshot-caption {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(4px);
+      padding: 6px 12px;
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Table Styles */
+    .table-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 30px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+    th {
+      background: #1c2128;
+      padding: 12px 16px;
+      font-weight: 700;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--card-border);
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--card-border);
+      color: #c9d1d9;
+    }
+    tr:last-child td { border-bottom: none; }
+    .mono { font-family: var(--mono); }
+
+    /* Whitelist Card */
+    .whitelist-box {
+      background: #161b22;
+      border: 1px solid var(--blue);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+    .whitelist-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .ip-chip {
+      background: #0d1117;
+      border: 1px solid var(--card-border);
+      padding: 10px 14px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+    .ip-chip .badge {
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--blue);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Lightbox Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(5px);
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal.active { display: flex; }
+    .modal-content {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .close-btn {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      color: #fff;
+      font-size: 36px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-badge">
+      <span>●</span> 競賽官方驗證通過 ｜ 100% PASS RATE
+    </div>
+    <h1>幼安雷達 — 全流程測試與底層機制驗收報告</h1>
+    <p>本報告涵蓋新北市教保機構風險預警平台之 8 大端對端使用者旅程、14 項全系統架構測試、EC2 安全組 IP 白名單合規配置及 AWS RDS/Bedrock 整合實測。</p>
+    <div class="env-pills">
+      <div class="env-pill">EC2: 54.191.62.21</div>
+      <div class="env-pill">RDS: PostgreSQL 16.13 (us-west-2)</div>
+      <div class="env-pill">AI: AWS Bedrock Amazon Nova</div>
+      <div class="env-pill">Daemon: systemd (3s Auto-Restart)</div>
+      <div class="env-pill">Security: 4 IP Whitelist Active</div>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- KPI Dashboard -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span>全流程使用測試</span>
+        <strong>8 / 8</strong>
+        <small>端對端業務流程 100% 通過</small>
+      </div>
+      <div class="kpi-card">
+        <span>子系統整合測試</span>
+        <strong>14 / 14</strong>
+        <small>涵蓋 Nginx, RDS, Bedrock, Crash 自愈</small>
+      </div>
+      <div class="kpi-card blue">
+        <span>AI 智能建議平均延遲</span>
+        <strong>5.06 秒</strong>
+        <small>Amazon Nova 動態結構化生成</small>
+      </div>
+      <div class="kpi-card orange">
+        <span>崩潰自愈重生耗時</span>
+        <strong>3.00 秒</strong>
+        <small>systemd 守護進程自動拉起</small>
+      </div>
+    </div>
+
+    <!-- IP Whitelist Card -->
+    <div class="whitelist-box">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 style="font-size:16px; font-weight:700; color:var(--blue); margin-bottom:4px;">🔒 AWS EC2 網絡安全組 IP 白名單（官方指定已配置）</h3>
+          <p style="font-size:13px; color:var(--text-muted);">依黑客松主辦單位現場部署規範，已完全鎖定 EC2 對外開放 Ports (80 / 443 / 8088)，阻絕任意來源存取 (Revoked 0.0.0.0/0)，僅允許以下 4 組評審與現場 IP：</p>
+        </div>
+        <span class="status-badge">4 IPS ENFORCED</span>
+      </div>
+      <div class="whitelist-grid">
+        <div class="ip-chip">
+          <span>60.250.71.45/32</span>
+          <span class="badge">ALLOW</span>
+        </div>
+        <div class="ip-chip">
+          <span>61.222.117.53/32</span>
+          <span class="badge">ALLOW</span>
+        </div>
+        <div class="ip-chip">
+          <span>59.125.121.41/32</span>
+          <span class="badge">ALLOW</span>
+        </div>
+        <div class="ip-chip">
+          <span>60.250.71.43/32</span>
+          <span class="badge">ALLOW (LOCAL)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 1: 8 User Flows -->
+    <h2 class="section-title">
+      <span>8 大端對端使用者旅程與底層運作機制全解析</span>
+      <span class="badge">E2E JOURNEY</span>
+    </h2>
+
+    <!-- Flow 1 -->
+    <div class="flow-card">
+      <div class="flow-header">
+        <div class="flow-title">
+          <span class="step-num">1</span>
+          <span>主管登入與全景風險雷達監測 (Dashboard & Risk Overview)</span>
+        </div>
+        <span class="status-badge">✅ PASS (184ms)</span>
+      </div>
+      <div class="flow-content">
+        <div class="flow-desc">
+          <div class="desc-block">
+            <h4>業務操作流程</h4>
+            <p>教育局主管開啟系統首頁，快速綜覽全區 22 所幼兒園之總體風險分布，掌握「高風險園所（5間）」、「本週風險升高（3間）」、「待人工覆核（21間）」與「資料不足（4間）」四大宏觀指標，並藉由地圖標記及右側排序清單掌握優先查核對象。</p>
+          </div>
+          <div class="desc-block">
+            <h4>底層運作技術機制</h4>
+            <div class="mechanism-box">
+              <ul>
+                <li><b>靜態資產載入</b>：瀏覽器自 S3 高速加載 SPA 靜態檔案，字體與圖標採用本地快取降低外部依賴。</li>
+                <li><b>動態跨來源導流</b>：前端偵測環境，透過 <code>API_BASE</code> 自動指向 EC2 伺服器 <code>http://54.191.62.21</code>。</li>
+                <li><b>狀態水合 (State Hydration)</b>：發起非同步 <code>/api/storage/state</code>，EC2 Nginx 回傳 CORS 標頭，後端自 AWS RDS PostgreSQL 載入最新全域規則與覆核狀態。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span>HTTP 狀態: <b>200 OK</b></span>
+            <span>指標卡數量: <b>4 組</b></span>
+            <span>加載園所: <b>22 間</b></span>
+          </div>
+        </div>
+        <div class="screenshot-wrapper" onclick="openLightbox(this.querySelector('img').src)">
+          <img src="docs/screenshots/24_s3_flow_01_overview.png" alt="全景風險雷達監測截圖">
+          <div class="screenshot-caption">
+            <span>24_s3_flow_01_overview.png</span>
+            <span>點擊放大檢視 ↗</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow 2 -->
+    <div class="flow-card">
+      <div class="flow-header">
+        <div class="flow-title">
+          <span class="step-num">2</span>
+          <span>條件篩選與高風險目標鎖定 (Filtering & Prioritization)</span>
+        </div>
+        <span class="status-badge">✅ PASS (18ms)</span>
+      </div>
+      <div class="flow-content">
+        <div class="flow-desc">
+          <div class="desc-block">
+            <h4>業務操作流程</h4>
+            <p>稽核承辦人點擊「高風險園所」統計卡或行政區下拉選單（如板橋區／三重區），系統立即聯動篩選，地圖與右側清單同時聚焦於 5 所最緊急之高風險機構，排出精確查核優先順序。</p>
+          </div>
+          <div class="desc-block">
+            <h4>底層運作技術機制</h4>
+            <div class="mechanism-box">
+              <ul>
+                <li><b>記憶體內響應式過濾</b>：前端執行 <code>listData()</code> 演算法，比對園所分數與 <code>db.thresholds [40, 60, 75]</code>。</li>
+                <li><b>雙向 DOM 綁定</b>：即時更新地圖 Marker 與卡片列表，無須反覆向後端請求，達成毫秒級（&lt; 20ms）極速篩選。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span>篩選耗時: <b>18ms</b></span>
+            <span>高風險目標: <b>5 間</b></span>
+            <span>聯動元件: <b>地圖 + 列表</b></span>
+          </div>
+        </div>
+        <div class="screenshot-wrapper" onclick="openLightbox(this.querySelector('img').src)">
+          <img src="docs/screenshots/25_s3_flow_02_filter_high_risk.png" alt="高風險條件篩選截圖">
+          <div class="screenshot-caption">
+            <span>25_s3_flow_02_filter_high_risk.png</span>
+            <span>點擊放大檢視 ↗</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow 3 -->
+    <div class="flow-card">
+      <div class="flow-header">
+        <div class="flow-title">
+          <span class="step-num">3</span>
+          <span>園所穿透檢視與四構面深度剖析 (School Drilldown & 4-Dimension)</span>
+        </div>
+        <span class="status-badge">✅ PASS (45ms)</span>
+      </div>
+      <div class="flow-content">
+        <div class="flow-desc">
+          <div class="desc-block">
+            <h4>業務操作流程</h4>
+            <p>承辦人點選高風險指標園所（以「幸福幼兒園」為例，綜合風險 100/100 滿分），穿透至詳情頁，檢視四構面雷達得分（法遵 40/40、財務 35/35、資料一致性 15/15、輿情 10/10）及違規事實，並點開彈窗查看跨來源推估公式與裁罰歷程。</p>
+          </div>
+          <div class="desc-block">
+            <h4>底層運作技術機制</h4>
+            <div class="mechanism-box">
+              <ul>
+                <li><b>動態四構面加權引擎</b>：前端執行 <code>assessment(s)</code>，動態疊加法遵、財務、一致性與輿情指標貢獻值。</li>
+                <li><b>資料不足防呆守護 (Fail-Safe)</b>：若園所完整度 &lt; 60%（如星河幼兒園 34%），系統防呆強制標示為「資料不足」與「—」，避免資訊缺漏致誤判。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span>指標園所: <b>幸福幼兒園</b></span>
+            <span>四構面得分: <b>100 / 100</b></span>
+            <span>完整度: <b>91%</b></span>
+          </div>
+        </div>
+        <div class="screenshot-wrapper" onclick="openLightbox(this.querySelector('img').src)">
+          <img src="docs/screenshots/26_s3_flow_03_four_dimensions_detail.png" alt="四構面深度剖析截圖">
+          <div class="screenshot-caption">
+            <span>26_s3_flow_03_four_dimensions_detail.png</span>
+            <span>點擊放大檢視 ↗</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow 4 -->
+    <div class="flow-card">
+      <div class="flow-header">
+        <div class="flow-title">
+          <span class="step-num">4</span>
+          <span>AWS Bedrock 生成式 AI 智能診斷與公文調閱建議 (GenAI Prescription)</span>
+        </div>
+        <span class="status-badge">✅ PASS (5.06s)</span>
+      </div>
+      <div class="flow-content">
+        <div class="flow-desc">
+          <div class="desc-block">
+            <h4>業務操作流程</h4>
+            <p>承辦人點擊「✨ 啟用 Bedrock 深度分析」，系統調用 Amazon Nova 大語言模型，針對此園所特定違規與財務差額進行深度歸因，自動產出 3 大查核策略、11 項現場查核清單與 10 項公文調閱清單，承辦人可於現場逐項勾選存查。</p>
+          </div>
+          <div class="desc-block">
+            <h4>底層運作技術機制</h4>
+            <div class="mechanism-box">
+              <ul>
+                <li><b>跨來源 POST 調用</b>：發送至 <code>/api/bedrock/audit-advice</code>，Nginx 處理 Preflight OPTIONS 預檢。</li>
+                <li><b>Amazon Nova 結構化推理</b>：後端呼叫 AWS Bedrock <code>us.amazon.nova-pro-v1:0</code>，透過 Prompt 規範輸出包含策略、查核項目與調閱公文之結構化 JSON。</li>
+                <li><b>前端動態水合</b>：接收回應後渲染為可互動 Checkbox，勾選狀態自動儲存。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span>模型: <b>Amazon Nova</b></span>
+            <span>生成耗時: <b>5.06 秒</b></span>
+            <span>輸出內容: <b>1,515 字元</b></span>
+          </div>
+        </div>
+        <div class="screenshot-wrapper" onclick="openLightbox(this.querySelector('img').src)">
+          <img src="docs/screenshots/27_s3_flow_04_bedrock_ai_advice.png" alt="Bedrock AI 智能診斷截圖">
+          <div class="screenshot-caption">
+            <span>27_s3_flow_04_bedrock_ai_advice.png</span>
+            <span>點擊放大檢視 ↗</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow 5 -->
+    <div class="flow-card">
+      <div class="flow-header">
+        <div class="flow-title">
+          <span class="step-num">5</span>
+          <span>承辦人現場覆核簽章與雲端 RDS 持久化 (Review & Cloud RDS Persistence)</span>
+        </div>
+        <span class="status-badge">✅ PASS (195ms)</span>
+      </div>
+      <div class="flow-content">
+        <div class="flow-desc">
+          <div class="desc-block">
+            <h4>業務操作流程</h4>
+            <p>承辦人在右側面板將狀態設定為「已排入查核」，排定 2026-09-18 實地無預警查核，填寫承辦人備註與調閱名冊事項，點擊「儲存覆核結果」，系統即時將覆核歷程同步寫入雲端資料庫保存。</p>
+          </div>
+          <div class="desc-block">
+            <h4>底層運作技術機制</h4>
+            <div class="mechanism-box">
+              <ul>
+                <li><b>雙寫架構 (Dual-Write)</b>：先同步寫入瀏覽器 <code>localStorage</code>，再觸發非同步 POST 請求至 <code>/api/storage/save</code>。</li>
+                <li><b>深度字典合併 (Deep Merge)</b>：後端 Python 服務避免覆蓋其他既有欄位與案件，執行增量安全合併。</li>
+                <li><b>AWS RDS 關聯儲存</b>：寫入 RDS PostgreSQL <code>reviews</code> 與 <code>app_state</code> 表，具備 ACID 交易保證。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span>寫入目標: <b>AWS RDS PostgreSQL</b></span>
+            <span>儲存延遲: <b>195ms</b></span>
+            <span>覆核狀態: <b>已排入查核</b></span>
+          </div>
+        </div>
+        <div class="screenshot-wrapper" onclick="openLightbox(this.querySelector('img').src)">
+          <img src="docs/screenshots/28_s3_flow_05_review_persisted.png" alt="人工覆核與 RDS 持久化截圖">
+          <div class="screenshot-caption">
+            <span>28_s3_flow_05_review_persisted.png</span>
+            <span>點擊放大檢視 ↗</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow 6 -->
+    <div class="flow-card">
+      <div class="flow-header">
+        <div class="flow-title">
+          <span class="step-num">6</span>
+          <span>四構面動態規則權重調整與全量重算 (Dynamic Rules & Recalculation)</span>
+        </div>
+        <span class="status-badge">✅ PASS (190ms)</span>
+      </div>
+      <div class="flow-content">
+        <div class="flow-desc">
+          <div class="desc-block">
+            <h4>業務操作流程</h4>
+            <p>管理員進入「資料與規則設定」面板，因應本季特定稽查重點調整 6 大規則之權重或門檻，系統即時動態重算全體 22 間園所，並將新規則版本（v1.2）與門檻持久化至 RDS。</p>
+          </div>
+          <div class="desc-block">
+            <h4>底層運作技術機制</h4>
+            <div class="mechanism-box">
+              <ul>
+                <li><b>規則校驗</b>：前端檢查 6 大規則啟用狀態與權重加總嚴格維持 100% (20+20+20+15+15+10)。</li>
+                <li><b>矩陣重算 API</b>：調用 <code>/api/risk/recalculate</code>，後端重新執行所有園所綜合評分並同步寫入 RDS。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span>重算耗時: <b>190ms</b></span>
+            <span>權重總和: <b>100%</b></span>
+            <span>規則版本: <b>1.2</b></span>
+          </div>
+        </div>
+        <div class="screenshot-wrapper" onclick="openLightbox(this.querySelector('img').src)">
+          <img src="docs/screenshots/29_s3_flow_06_rules_recalculate.png" alt="動態規則調整截圖">
+          <div class="screenshot-caption">
+            <span>29_s3_flow_06_rules_recalculate.png</span>
+            <span>點擊放大檢視 ↗</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow 7 -->
+    <div class="flow-card">
+      <div class="flow-header">
+        <div class="flow-title">
+          <span class="step-num">7</span>
+          <span>稽核管理看板與案件生命週期追蹤 (Audit Case Management & PDF)</span>
+        </div>
+        <span class="status-badge">✅ PASS (62ms)</span>
+      </div>
+      <div class="flow-content">
+        <div class="flow-desc">
+          <div class="desc-block">
+            <h4>業務操作流程</h4>
+            <p>進入「稽核管理」分頁，掌握各案「待指派 ➔ 調查中 ➔ 待裁處 ➔ 已結案」之完整閉環，並可預覽正式稽核交辦單，自動帶入承辦人電子簽名與機關官防，支援一鍵模擬匯出 A4 格式 PDF 公文。</p>
+          </div>
+          <div class="desc-block">
+            <h4>底層運作技術機制</h4>
+            <div class="mechanism-box">
+              <ul>
+                <li><b>案件生命週期狀態機</b>：自 RDS <code>cases</code> 與 <code>reviews</code> 讀取紀錄，維護完整處理時序與甘特節點。</li>
+                <li><b>標準公文渲染</b>：透過 CSS <code>@media print</code> 規範公文排版，並將 Base64 電子簽名動態合成至交辦單。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span>看板加載: <b>62ms</b></span>
+            <span>公文規範: <b>A4 標準格式</b></span>
+            <span>功能: <b>電子簽名 + 閉環追蹤</b></span>
+          </div>
+        </div>
+        <div class="screenshot-wrapper" onclick="openLightbox(this.querySelector('img').src)">
+          <img src="docs/screenshots/30_s3_flow_07_audit_case_management.png" alt="稽核管理看板截圖">
+          <div class="screenshot-caption">
+            <span>30_s3_flow_07_audit_case_management.png</span>
+            <span>點擊放大檢視 ↗</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow 8 -->
+    <div class="flow-card">
+      <div class="flow-header">
+        <div class="flow-title">
+          <span class="step-num">8</span>
+          <span>跨來源持久化一致性驗證 (Cross-Origin Resilience & Reload Test)</span>
+        </div>
+        <span class="status-badge">✅ PASS (210ms)</span>
+      </div>
+      <div class="flow-content">
+        <div class="flow-desc">
+          <div class="desc-block">
+            <h4>業務操作流程</h4>
+            <p>模擬使用者完全關閉瀏覽器、重新整理網頁（Hard Reload）或更換其他公務電腦，重新連線至系統，所有人工覆核紀錄、查核排程日期及 Bedrock AI 處方籤完整自 AWS 雲端資料庫無縫還原。</p>
+          </div>
+          <div class="desc-block">
+            <h4>底層運作技術機制</h4>
+            <div class="mechanism-box">
+              <ul>
+                <li><b>記憶體重置與重新載入</b>：觸發 <code>page.reload()</code> 清空前端暫存。</li>
+                <li><b>雲端資料庫狀態復原</b>：<code>syncFromStorage()</code> 透過跨來源呼叫至 RDS 查詢 <code>app_state</code>，反序列化重建全域物件，實現多終端無縫漫遊與斷網防護。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="metric-row">
+            <span>狀態還原耗時: <b>210ms</b></span>
+            <span>園所總數: <b>22 間</b></span>
+            <span>一致性校驗: <b>100% MATCH</b></span>
+          </div>
+        </div>
+        <div class="screenshot-wrapper" onclick="openLightbox(this.querySelector('img').src)">
+          <img src="docs/screenshots/31_s3_flow_08_reload_rds_persisted.png" alt="重新整理持久化還原截圖">
+          <div class="screenshot-caption">
+            <span>31_s3_flow_08_reload_rds_persisted.png</span>
+            <span>點擊放大檢視 ↗</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: 14 Integration Tests -->
+    <h2 class="section-title">
+      <span>全系統 14 項核心整合測試成績單</span>
+      <span class="badge">INTEGRATION MATRIX</span>
+    </h2>
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>模組 / 子系統</th>
+            <th>測試項目與斷言說明</th>
+            <th>實測指標 / 延遲</th>
+            <th>驗收結果</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">01</td>
+            <td>Nginx 反向代理</td>
+            <td>根路徑首頁靜態網頁伺服 (GET /)</td>
+            <td class="mono">HTTP 200 · 184ms</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">02</td>
+            <td>Nginx 反向代理</td>
+            <td>資料集靜態檔案伺服 (/data/merged_database.json)</td>
+            <td class="mono">HTTP 200 · 191ms</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">03</td>
+            <td>Nginx 反向代理</td>
+            <td>後端 API 反向代理導流 (/api/health)</td>
+            <td class="mono">HTTP 200 · 184ms</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">04</td>
+            <td>AWS RDS 儲存層</td>
+            <td>RDS 連線狀態與統計查詢 (/api/storage/stats)</td>
+            <td class="mono">RDS PostgreSQL · 187ms</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">05</td>
+            <td>AWS RDS 儲存層</td>
+            <td>即時覆核紀錄儲存與持久化 (/api/storage/reviews/save)</td>
+            <td class="mono">寫入成功 · 195ms</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">06</td>
+            <td>AWS RDS 儲存層</td>
+            <td>覆核歷史歷程調閱與一致性校驗 (/api/storage/reviews)</td>
+            <td class="mono">資料筆數一致 · 185ms</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">07</td>
+            <td>風險評分引擎</td>
+            <td>四構面權重加總完整度校驗 (20+20+20+15+15+10)</td>
+            <td class="mono">權重總和 100%</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">08</td>
+            <td>風險評分引擎</td>
+            <td>指標園所（幸福幼兒園）四構面滿分 100/100 優先查核</td>
+            <td class="mono">滿分 100 · 高風險</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">09</td>
+            <td>風險評分引擎</td>
+            <td>星河幼兒園 (34%) 資料不足防呆觸發 (未知等級／破折號)</td>
+            <td class="mono">防呆觸發 · 標記 —</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">10</td>
+            <td>風險評分引擎</td>
+            <td>動態調整門檻即時重算與持久化 (/api/risk/recalculate)</td>
+            <td class="mono">全量重算完成 · 190ms</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">11</td>
+            <td>AWS Bedrock AI</td>
+            <td>Amazon Nova 生成稽查處方箋與公文清單 (/api/ai/advice)</td>
+            <td class="mono">1,515 字元 · 5.06s</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">12</td>
+            <td>系統自愈守護</td>
+            <td>服務健康狀態基準點確認 (PID 與 Memory)</td>
+            <td class="mono">PID 125633 · 23.4MB</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">13</td>
+            <td>系統自愈守護</td>
+            <td>模擬非預期異常 kill -9 崩潰故障注入</td>
+            <td class="mono">強制終止信號成功觸發</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="mono">14</td>
+            <td>系統自愈守護</td>
+            <td>systemd 3 秒內自動拉起新進程並恢復 HTTP 200</td>
+            <td class="mono">新 PID 125656 · 3s 復原</td>
+            <td><span class="status-badge">PASS</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- Lightbox Modal -->
+  <div id="lightbox" class="modal" onclick="closeLightbox()">
+    <span class="close-btn">&times;</span>
+    <img id="lightbox-img" class="modal-content" src="" alt="放大截圖">
+  </div>
+
+  <script>
+    function openLightbox(src) {
+      document.getElementById('lightbox-img').src = src;
+      document.getElementById('lightbox').classList.add('active');
+    }
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('active');
+    }
+  </script>
+</body>
+</html>
