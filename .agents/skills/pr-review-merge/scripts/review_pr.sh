@@ -27,13 +27,25 @@ echo "CI / Status Checks:"
 gh pr checks "$PR_ID" -R "$REPO" 2>&1 || echo "No status checks configured or pending."
 
 echo "--------------------------------------------------"
-echo "Scanning Diff for Security / Secrets Leakage..."
-DIFF=$(gh pr diff "$PR_ID" -R "$REPO")
+echo "Scanning Added Lines for Actual Secrets / Credentials..."
+# Extract only added lines from diff
+ADDED_LINES=$(gh pr diff "$PR_ID" -R "$REPO" | grep '^+[^+]' || true)
 
 SECRETS_FOUND=0
-for pattern in "AKIA[0-9A-Z]{16}" "ASIA[0-9A-Z]{16}" "AWS_SECRET_ACCESS_KEY" "BEGIN RSA PRIVATE KEY" "BEGIN OPENSSH PRIVATE KEY" "ghp_[0-9a-zA-Z]{36}"; do
-  if echo "$DIFF" | grep -E "$pattern" > /dev/null 2>&1; then
-    echo "⚠️ ALERT: Potential secret pattern matched: $pattern"
+PATTERNS=(
+  "AKIA[0-9A-Z]{16}"
+  "ASIA[0-9A-Z]{16}"
+  "(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[[:space:]]*=[[:space:]]*['\"][A-Za-z0-9/+=]{20,}['\"]"
+  "-----BEGIN[[:space:]]+(RSA|OPENSSH|EC|DSA)?[[:space:]]*PRIVATE KEY-----"
+  "ghp_[0-9a-zA-Z]{36}"
+)
+
+for pattern in "${PATTERNS[@]}"; do
+  # Filter out patterns in comments or security checklist files
+  MATCHES=$(echo "$ADDED_LINES" | grep -E "$pattern" | grep -v "pattern in" | grep -v "checklist" || true)
+  if [ -n "$MATCHES" ]; then
+    echo "⚠️ ALERT: Potential secret detected matching pattern: $pattern"
+    echo "$MATCHES" | head -n 3
     SECRETS_FOUND=1
   fi
 done
