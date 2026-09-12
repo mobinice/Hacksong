@@ -603,6 +603,8 @@
   function availableFields(){return [...new Set(['staffCostPerStudent',...allImportFields.map(f=>f[0]),...Object.values(model.data).flatMap(ys=>Object.values(ys).flatMap(r=>Object.keys(r)))])].filter(k=>!['name','district','address','type','schoolId','year'].includes(k));}
   function sourceState(s){const rr=Object.values(records(s.id));return rr.some(r=>r.conflict)?'conflict':assessment(s).coverage<60?'missing':'ready';}
   function workRows(){return activeSchools().filter(s=>(!workQuery||(s.name+s.address+`${caseNumber(s.id)}`).includes(workQuery))&&(!workDistrict||s.district===workDistrict)&&(!workState||sourceState(s)===workState));}
+  Y.navigationState=()=>({workQuery,workDistrict,workState});
+  Y.restoreNavigationState=s=>{if(s){workQuery=s.workQuery||'';workDistrict=s.workDistrict||'';workState=s.workState||'';}};
   Y.refreshWork=()=>{if(page==='data')renderWorkRows();};
   Y.year=y=>{model.year=y;workSelected.clear();recalc('切換年度');persist();render();};
   Y.workFilter=(key,v)=>{if(key==='q')workQuery=v;if(key==='district')workDistrict=v;if(key==='state')workState=v;renderWorkRows();};

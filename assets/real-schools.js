@@ -31,8 +31,9 @@
   const baseRender=render;
   render=()=>{baseRender();if(page==='data'&&real.length){const heading=document.querySelector('#page .heading');const box=document.createElement('div');box.className='source-switch';box.style.marginBottom='16px';box.innerHTML=switchMarkup();heading.after(box)}};
   function summary(s){
+    window.Navigation?.summary(s.id);
     const a=Y.assessment(s.id);
-    openModal('園所風險摘要',`<div class="real-detail"><h2>${esc(s.name)}</h2><p class="muted">${esc(s.type)} · ${esc(s.district)} · 核定 ${s.capacity} 人<br>${esc(s.address)}</p><div class="compare"><div><small>綜合風險分數</small><strong class="${cls(s)}">${s.complete<60?'—':a.score}</strong><span class="pill ${cls(s)}">${level(s)}</span></div><div><small>資料完整度</small><strong>${s.complete}%</strong></div></div><h3 style="margin-top:16px">分數組成</h3>${DIMS.map(([k,label])=>{const rows=a.rows.filter(r=>r.dimension===label&&r.enabled),max=rows.reduce((n,r)=>n+r.weight,0),score=rows.reduce((n,r)=>n+r.contribution,0);return `<div class="bar-row"><span>${label}<small style="display:block">權重 ${max}%</small></span><div class="bar"><i style="width:${s.complete<60?0:Math.max(0,Math.min(100,max?score/max*100:0))}%"></i></div><span>${s.complete<60?'待補':Math.round(score*100)/100+' 分'}</span></div>`}).join('')}<div class="notice" style="margin-top:18px">財務與事件數值為合成示範。分數由目前規則即時計算，僅供展示查核流程。</div><div class="form-actions"><button onclick="closeModal()">關閉</button><button class="primary" onclick="closeModal();go('detail',${esc(JSON.stringify(s.id))})">查看更多 →</button></div></div>`);
+    openModal('園所風險摘要',`<div class="real-detail"><h2>${esc(s.name)}</h2><p class="muted">${esc(s.type)} · ${esc(s.district)} · 核定 ${s.capacity} 人<br>${esc(s.address)}</p><div class="compare"><div><small>綜合風險分數</small><strong class="${cls(s)}">${s.complete<60?'—':a.score}</strong><span class="pill ${cls(s)}">${level(s)}</span></div><div><small>資料完整度</small><strong>${s.complete}%</strong></div></div><h3 style="margin-top:16px">分數組成</h3>${DIMS.map(([k,label])=>{const rows=a.rows.filter(r=>r.dimension===label&&r.enabled),max=rows.reduce((n,r)=>n+r.weight,0),score=rows.reduce((n,r)=>n+r.contribution,0);return `<div class="bar-row"><span>${label}<small style="display:block">權重 ${max}%</small></span><div class="bar"><i style="width:${s.complete<60?0:Math.max(0,Math.min(100,max?score/max*100:0))}%"></i></div><span>${s.complete<60?'待補':Math.round(score*100)/100+' 分'}</span></div>`}).join('')}<div class="notice" style="margin-top:18px">財務與事件數值為合成示範。分數由目前規則即時計算，僅供展示查核流程。</div><div class="form-actions"><button onclick="closeModal()">關閉</button><button class="primary" onclick="go('detail',${esc(JSON.stringify(s.id))})">查看更多 →</button></div></div>`);
   }
   detail=()=>{
     baseDetail();const s=schoolById(selected);if(!s?.external)return;
@@ -43,6 +44,6 @@
     real=(Array.isArray(body)?body:body.data||[]).map(normalize).filter(s=>s.name&&hasCoords(s));if(!real.length)return;
     Y.registerExternalSchools(real);mode='real';
     document.querySelector('.topline .demo').textContent=`公開園所 ${real.length} 間 · 財務／事件為示範試算`;
-    render();
+    render();window.Navigation?.ready();
   }).catch(e=>console.info('園所 API 未就緒，使用示範資料：',e));
 })();
