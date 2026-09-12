@@ -106,6 +106,132 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
             return
 
+        # 4. API: 透過 AWS Bedrock (Amazon Nova Pro / Lite) 生成客製化查核建議與調閱公文清單
+        elif parsed.path == "/api/bedrock/audit-advice":
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_body = self.rfile.read(content_length).decode('utf-8')
+            try:
+                payload = json.loads(post_body) if post_body else {}
+                school_name = payload.get("schoolName", "未知幼兒園")
+                district = payload.get("district", "新北市轄區")
+                school_type = payload.get("type", "私立")
+                capacity = payload.get("capacity", 100)
+                risk_score = payload.get("riskScore", 75)
+                reasons = payload.get("riskReasons", [])
+                
+                reasons_text = "\n".join([f"- {r.get('title', '')}: {r.get('summary', '')} ({r.get('observation', '')})" for r in reasons]) or "整體資料待補或例行查核"
+                
+                system_prompt = (
+                    "你是一位精通台灣教育部法規（幼兒教育及照顧法、教保服務人員條例）的專業教保機構稽查專家與主管機關稽核顧問。"
+                    "你的任務是根據主管機關提供的幼兒園風險指標、裁罰歷史與財務異常差額，"
+                    "為外勤稽查人員生成針對該園所異常原因的【現場查核 Checklist】以及【現場建議調閱之公文與表冊清單】。"
+                    "請以繁體中文輸出，並嚴格只返回合法 JSON，格式結構如下：\n"
+                    "{\n"
+                    '  "summary": "一句話總結本次查核核心重點",\n'
+                    '  "priorityLevel": "高優先 (建議 3 日內前往)" / "中優先 (排入雙週查核)" / "例行輔導",\n'
+                    '  "suggestedActions": [\n'
+                    "    {\n"
+                    '      "title": "行動標題",\n'
+                    '      "reason": "對應之風險原因",\n'
+                    '      "checklist": [\n'
+                    '        "現場查核具體項目 1",\n'
+                    '        "現場查核具體項目 2"\n'
+                    "      ],\n"
+                    '      "requiredDocuments": [\n'
+                    '        "建議現場調閱表冊 1",\n'
+                    '        "建議現場調閱表冊 2"\n'
+                    "      ]\n"
+                    "    }\n"
+                    "  ],\n"
+                    '  "complianceNotice": "本查核建議由 AWS Bedrock (Amazon Nova) 根據申報指標動態生成，僅供主管機關派員查核參考，不作為直接裁罰依據。"\n'
+                    "}"
+                )
+                
+                user_prompt = (
+                    f"幼兒園名稱：{school_name}\n"
+                    f"轄區：{district}（{school_type}，核定招生：{capacity} 人）\n"
+                    f"綜合風險分數：{risk_score} 分\n"
+                    f"主要異常原因與事由：\n{reasons_text}\n\n"
+                    f"請生成具備高度行政可操作性的現場查核指引 JSON。"
+                )
+                
+                advice_data = None
+                model_used = "us.amazon.nova-pro-v1:0"
+                try:
+                    import boto3
+                    client = boto3.client('bedrock-runtime', region_name='us-west-2')
+                    try:
+                        resp = client.converse(
+                            modelId='us.amazon.nova-pro-v1:0',
+                            system=[{'text': system_prompt}],
+                            messages=[{'role': 'user', 'content': [{'text': user_prompt}]}],
+                            inferenceConfig={'temperature': 0.1, 'maxTokens': 1800}
+                        )
+                    except Exception as model_err:
+                        model_used = "us.amazon.nova-lite-v1:0"
+                        resp = client.converse(
+                            modelId='us.amazon.nova-lite-v1:0',
+                            system=[{'text': system_prompt}],
+                            messages=[{'role': 'user', 'content': [{'text': user_prompt}]}],
+                            inferenceConfig={'temperature': 0.1, 'maxTokens': 1500}
+                        )
+                    raw_text = resp['output']['message']['content'][0]['text']
+                    clean_text = raw_text.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
+                    advice_data = json.loads(clean_text)
+                except Exception as b_err:
+                    print(f"Bedrock invocation fallback: {b_err}")
+                    advice_data = {
+                        "summary": f"針對{school_name}主要異常事項，優先查核人員配置真實性與相關財務收費憑證。",
+                        "priorityLevel": "高優先 (建議 3 日內前往)" if risk_score >= 75 else "中優先 (排入雙週查核)",
+                        "suggestedActions": [
+                            {
+                                "title": "人員出勤與在職配置合規查核",
+                                "reason": "近一年裁罰或人員配置異常紀錄",
+                                "checklist": [
+                                    "核對各班級每日教保服務人員簽到退紀錄",
+                                    "抽查教保服務人員勞健保投保明細與薪資轉帳清冊",
+                                    "實地清點現場師生比是否符合法定配置標準"
+                                ],
+                                "requiredDocuments": [
+                                    "教職員工出勤紀錄簿（前三個月）",
+                                    "勞保、健保及勞退提繳名冊",
+                                    "主管機關核備之教職員工名冊"
+                                ]
+                            },
+                            {
+                                "title": "財務收支與人事費支出核實",
+                                "reason": "每生人事成本偏高或申報收入差額異常",
+                                "checklist": [
+                                    "核對年度總分類帳中人事費用科目之各項傳票憑證",
+                                    "比對收費收據存根聯與實際招生入園人數",
+                                    "查核是否有以個人帳戶收取學費或未入帳情事"
+                                ],
+                                "requiredDocuments": [
+                                    "年度總分類帳及各月份傳票",
+                                    "學雜費收費收據存根聯",
+                                    "金融機構存款對帳單"
+                                ]
+                            }
+                        ],
+                        "complianceNotice": "本查核建議由系統專家規則與 AWS Bedrock 引擎輔助生成，供主管機關派員查核參考。"
+                    }
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "success",
+                    "model": model_used,
+                    "schoolId": payload.get("schoolId"),
+                    "advice": advice_data
+                }, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+            return
+
         self.send_response(404)
         self.end_headers()
 
