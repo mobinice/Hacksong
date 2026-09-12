@@ -1,103 +1,98 @@
-/* Official registry browser. No synthetic risk metrics or demo evidence is mixed in. */
-(() => {
-  'use strict';
-  const state = {page:0, size:25, q:'', district:'', type:'', result:null, error:'', busy:false};
-  let request=0, controller, debounce, reportRequest=0;
-  const html = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const show = value => value === null || value === undefined || value === '' ? '未提供' : html(value);
-  const reportLink = path => /^data\/reports\/[a-f0-9]{24}\.json$/.test(path || '') ? path : null;
-  const sourceLink = value => {
-    try {const u=new URL(value); return u.protocol==='https:' && ['ap.ece.moe.edu.tw','data.ntpc.gov.tw'].includes(u.hostname) ? html(u.href) : null;}
-    catch {return null;}
-  };
-  document.querySelector('#modal').addEventListener('close',()=>reportRequest++);
-  const button=document.createElement('button');
-  button.id='nav-real';button.textContent='新北市真實園所';button.onclick=()=>go('real');
-  document.querySelector('nav').prepend(button);
+/* 真實園所模式：讀取後端 /api/schools（同步自教育部全國教保資訊網），
+   風險總覽的地圖、清單、摘要卡與詳情彈窗改用真實園所資料。
+   內建 22 間示範園所仍保留，供規則引擎、資料工作台、查核流程等展示使用；
+   API 不可用時自動停留在示範資料，畫面不會空白。 */
+(function(){
+  if(window.officialMode)return;
+  const API='/api/schools';
+  let real=[],mode='demo';
+  const DIMS=[['compliance','法遵／裁罰／評鑑'],['finance','財務／收費'],['consistency','資料一致性'],['sentiment','輿情預警']];
 
-  const baseRender=render;
-  render=()=>{
-    document.querySelector('.topline .demo').textContent='官方資料快照 · 缺值如實標示';
-    if(page!=='real') {baseRender();return;}
-    document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.id==='nav-real'));
-    document.querySelector('#page').innerHTML=`<div class="heading"><div><h1>新北市立案幼兒園</h1><p>新北市政府名錄 × 教育部評鑑紀錄與報告</p></div><button id="real-refresh">重新載入資料</button></div>
-      <div class="notice">立案字號、每生月費、實際在園人數如未公開，顯示「未提供」。核定招生人數不等於實際在園人數；本頁未產生推估風險分數。</div>
-      <form id="real-search" class="panel pad real-filters" style="margin-top:18px">
-        <label class="field">搜尋園名、地址或立案字號<input id="real-q" maxlength="100" placeholder="例如：板橋、悅淨、莒光" value="${html(state.q)}"></label>
-        <label class="field">行政區<select id="real-district"><option value="">全部行政區</option></select></label>
-        <label class="field">設立別／類型<select id="real-type"><option value="">全部類型</option>${['公立','私立','非營利','準公共'].map(t=>`<option ${state.type===t?'selected':''}>${t}</option>`).join('')}</select></label>
-        <button class="primary" type="submit">搜尋</button>
-      </form><div id="real-results" aria-live="polite"></div>`;
-    document.querySelector('#real-search').onsubmit=e=>{e.preventDefault();clearTimeout(debounce);search();};
-    document.querySelector('#real-q').oninput=()=>{clearTimeout(debounce);debounce=setTimeout(search,300);};
-    document.querySelector('#real-district').onchange=search;
-    document.querySelector('#real-type').onchange=search;
-    document.querySelector('#real-refresh').onclick=load;
-    draw();load();
+  function shortName(name,district){let n=String(name||'').replace(/^新北市/,'');if(district)n=n.replace(district,'');n=n.replace(/國民小學附設幼兒園$/,'國小附幼').replace(/附設幼兒園$/,'附幼');return n.length>12?n.slice(0,11)+'…':n}
+  const anomalous=s=>s.domains.some(d=>d.status==='failed')||s.evidences.some(e=>/高/.test(e.impact||''));
+  function normalize(r){
+    const c=Array.isArray(r.coordinates)?r.coordinates:[r.lat,r.lng];
+    const score=r.totalScore==null?null:Number(r.totalScore);
+    const incomplete=r.riskLevel==='incomplete'||score==null;
+    let complete=Number(r.completeness)||0;if(incomplete)complete=Math.min(complete,59);
+    return {id:String(r.id),external:true,name:String(r.name||'未命名園所'),district:String(r.district||''),
+      address:String(r.address||'').replace(/\[\d+\]/,''),short:shortName(r.name,r.district),lat:Number(c?.[0]),lng:Number(c?.[1]),
+      type:r.type||'未提供',capacity:Number(r.capacity)||0,score:score??0,incomplete,complete,trend:0,
+      factors:Array.isArray(r.keyFactors)?r.keyFactors:[],scores:r.scores||{},domains:Array.isArray(r.domainsStatus)?r.domainsStatus:[],
+      evaluations:Array.isArray(r.evaluations)?r.evaluations:[],evidences:Array.isArray(r.detailedEvidences)?r.detailedEvidences:[],
+      checklist:Array.isArray(r.aiChecklist)?r.aiChecklist:[],notes:r.auditNotes||'',sourceUrl:r.sourceUrl||'',
+      telephone:r.telephone||'',auditStatus:r.auditStatus||'',auditDue:r.auditDueDate||'',caseId:r.caseId||''};
+  }
+
+  /* 覆寫資料層入口 */
+  const baseActive=activeSchools,baseDistricts=activeDistricts,baseFind=findSchool,baseOpen=openSchool;
+  activeSchools=()=>mode==='real'?real:baseActive();
+  activeDistricts=()=>mode==='real'?[...new Set(real.map(s=>s.district))].filter(Boolean):baseDistricts();
+  findSchool=id=>mode==='real'?real.find(s=>s.id===String(id)):baseFind(id);
+  openSchool=id=>{const s=mode==='real'?real.find(s=>s.id===String(id)):null;if(s)openRealDetail(s);else baseOpen(id)};
+
+  /* 覆寫判斷函式：真實園所沒有前端規則引擎的原始觀測值，等級直接依後端分數與門檻 */
+  const baseLevel=level,baseCls=cls,baseReasons=reasons,baseList=listData,baseOverview=overview,baseUpdate=updateResults;
+  updateResults=()=>{baseUpdate();if(mode!=='real')return;const rows=listData();document.querySelectorAll('#results .school-row').forEach((el,i)=>{const s=rows[i];if(!s)return;const sm=el.querySelector('small');if(sm)sm.textContent=`${status(s)} · 資料完整度 ${s.complete}%`;const sc=el.querySelector('.score');if(sc)sc.textContent=s.incomplete?'—':s.score})};
+  const thresholds=()=>Array.isArray(db?.thresholds)&&db.thresholds.length===3?db.thresholds:[40,60,75];
+  level=s=>{if(!(s&&s.external))return baseLevel(s);if(s.incomplete)return '資料不足';const t=thresholds();return s.score>=t[2]?'高風險':s.score>=t[1]?'中高風險':s.score>=t[0]?'中風險':'低風險'};
+  cls=s=>s&&s.external?(s.incomplete?'unknown':level(s)==='高風險'?'high':level(s)==='低風險'?'low':'mid'):baseCls(s);
+  reasons=s=>s&&s.external?(s.factors.length?s.factors:['目前公開資料未見風險因子']).map(t=>({title:t,summary:'',source:'教育部全國教保資訊網'})):baseReasons(s);
+  listData=()=>{
+    if(mode!=='real')return baseList();
+    return real.filter(s=>(!filters.q||(s.name+s.address).includes(filters.q))
+      &&(!filters.district||s.district===filters.district)
+      &&(!filters.risk||level(s)===filters.risk)
+      &&(!metric||(metric==='high'?level(s)==='高風險':metric==='rising'?anomalous(s):metric==='pending'?status(s)==='待查核':s.incomplete)))
+      .sort((a,b)=>filters.sort==='complete'?a.complete-b.complete:b.score-a.score);
   };
-  function search() {
-    if(page!=='real')return;
-    state.q=document.querySelector('#real-q').value;
-    state.district=document.querySelector('#real-district').value;
-    state.type=document.querySelector('#real-type').value;
-    state.page=0;load();
+  overview=()=>{
+    baseOverview();
+    const cards=document.querySelectorAll('.metrics .metric');
+    if(mode==='real'&&cards.length>=4){
+      const strong1=cards[1].querySelector('strong'),strong3=cards[3].querySelector('strong');
+      if(strong1)strong1.innerHTML=`${real.filter(anomalous).length}<small> 間</small>`;
+      if(strong3)strong3.innerHTML=`${real.filter(s=>s.incomplete).length}<span> 間</span>`;
+      const sub1=cards[1].querySelectorAll('small')[1];if(sub1)sub1.textContent='評鑑有待改善類別或高影響事證';
+    }
+    renderSwitch();
+  };
+
+  function renderSwitch(){
+    const el=document.getElementById('source-switch');if(!el)return;
+    if(!real.length){el.innerHTML='';return}
+    el.innerHTML=`<button type="button" class="${mode==='real'?'active':''}" aria-pressed="${mode==='real'}" onclick="setSchoolSource('real')">真實園所 ${real.length} 間</button><button type="button" class="${mode==='demo'?'active':''}" aria-pressed="${mode==='demo'}" onclick="setSchoolSource('demo')">示範資料 ${schools.length} 間</button><small>${mode==='real'?'資料同步自教育部全國教保資訊網，座標為真實園所位置。':'示範資料用於展示規則設定與查核流程。'}</small>`;
   }
-  async function load() {
-    const sequence=++request;
-    controller?.abort();controller=new AbortController();
-    state.busy=true;state.error='';draw();
-    try {
-      const params=new URLSearchParams({page:state.page,size:state.size,q:state.q,district:state.district,type:state.type});
-      const response=await fetch('/api/schools?'+params,{signal:controller.signal});
-      if(!response.ok)throw Error(`資料 API 回應 ${response.status}；請使用 python3 server.py 啟動服務。`);
-      const data=await response.json();
-      if(!Array.isArray(data.data)||!data.metadata||data.metadata.partial)throw Error('尚未建立完整真實資料快照，請先執行 python3 scripts/crawl_moe.py。');
-      if(sequence===request)state.result=data;
-    } catch(error) {
-      if(sequence===request&&error.name!=='AbortError'){state.error=error.message;state.result=null;}
-    } finally {if(sequence===request){state.busy=false;draw();}}
+  window.schoolSource=()=>({mode,count:real.length});
+  window.setSchoolSource=m=>{if(m===mode)return;mode=m;filters.district='';filters.risk='';metric='';overview()};
+
+  function openRealDetail(s){
+    const lv=level(s),c=cls(s);
+    const dims=DIMS.map(([k,label])=>{const d=s.scores[k]||{};const sc=Number(d.score)||0,max=Number(d.max)||1;return `<div class="bar-row"><span>${esc(d.label||label)}</span><div class="bar"><i style="width:${Math.min(100,sc/max*100)}%"></i></div><span>${s.incomplete?'待補':sc+' / '+max}</span></div>`}).join('');
+    const domains=s.domains.length?`<h3>評鑑六大類別</h3><div class="domains">${s.domains.map(d=>`<span class="${d.status==='failed'?'failed':''}">${esc(d.name)}：${esc(d.label||'')}</span>`).join('')}</div>`:'';
+    const evals=s.evaluations.length?`<h3>教育部評鑑紀錄</h3><ul>${s.evaluations.map(e=>`<li>${esc(e.year||'')} 學年度：${esc(e.result||'')}${e.date?`（${esc(e.date)}）`:''}</li>`).join('')}</ul>`:'';
+    const evid=s.evidences.length?`<h3>判斷依據</h3><ul>${s.evidences.map(e=>`<li><b>${esc(e.title||'')}</b>｜${esc(e.rule||'')}<br><small>${esc(e.observed||'')} · 來源：${esc(e.source||'')} · ${esc(e.impact||'')}</small></li>`).join('')}</ul>`:'';
+    const check=s.checklist.length?`<h3>AI 建議查核項目 <small class="muted">（由後端 Bedrock 產生，僅供承辦人參考）</small></h3><ul>${s.checklist.map(i=>`<li>${i.checked?'☑':'☐'} ${esc(i.text||'')}</li>`).join('')}</ul>`:'';
+    openModal('園所風險詳情（真實資料）',`<div class="real-detail">
+      <h2 style="margin:0 0 4px">${esc(s.name)} <span class="pill ${c}">${lv}</span></h2>
+      <p class="muted" style="font-size:13px">${esc(s.type)} · ${esc(s.district)} · 核定 ${s.capacity} 人${s.telephone?` · ${esc(s.telephone)}`:''}<br>${esc(s.address)}</p>
+      <div class="compare" style="margin-top:12px"><div><small>綜合風險分數</small><strong class="${c}">${s.incomplete?'—':s.score}</strong></div><div><small>資料完整度</small><strong>${s.complete}%</strong></div><div><small>案件狀態</small><strong style="font-size:16px">${esc(s.auditStatus||status(s))}</strong></div></div>
+      <div class="dims">${dims}</div>
+      <h3>主要風險因子</h3><ul>${reasons(s).map(r=>`<li>${esc(r.title)}</li>`).join('')}</ul>
+      ${domains}${evals}${evid}${check}
+      ${s.notes?`<div class="notice" style="margin-top:14px">${esc(s.notes)}</div>`:''}
+      <p class="muted" style="font-size:12px;margin-top:12px">風險分數僅供查核排序，不是違法認定。${s.sourceUrl?`<a href="${esc(s.sourceUrl)}" target="_blank" rel="noopener">查看教育部原始資料 ↗</a>`:''}</p>
+      <div class="form-actions"><button onclick="closeModal()">關閉</button><button class="primary" onclick="closeModal();locateSchool(${JSON.stringify(s.id)})">在地圖上定位</button></div>
+    </div>`);
   }
-  function draw() {
-    const target=document.querySelector('#real-results');if(page!=='real'||!target)return;
-    if(state.error){target.innerHTML=`<div class="panel pad" role="alert">${html(state.error)}</div>`;return;}
-    const result=state.result;
-    if(!result){target.innerHTML='<div class="panel pad">正在讀取真實園所資料…</div>';return;}
-    const select=document.querySelector('#real-district');
-    select.innerHTML='<option value="">全部行政區</option>'+result.districts.map(d=>`<option ${state.district===d?'selected':''}>${html(d)}</option>`).join('');
-    const m=result.metadata;
-    target.innerHTML=`<p class="muted" style="margin:14px 0">名錄 ${m.registryCount} 間 · 教育部 ${m.moeCount} 間 · 整合 ${m.schoolCount} 筆 · ${html(m.retrievedAt)}${state.busy?' · 更新中…':''}</p>
-      <div class="panel"><div class="panel-head"><h2>查詢結果 ${result.total} 筆</h2><small>第 ${result.totalPages?result.page+1:0}／${result.totalPages} 頁</small></div>
-      <div class="table-wrap"><table><thead><tr><th>園所／行政區</th><th>設立別／類型</th><th>地址／電話</th><th>立案字號</th><th>核定人數</th><th>每生月費</th><th>評鑑歷史</th></tr></thead><tbody>
-      ${result.data.map((s,i)=>`<tr><td><button class="link" data-school="${i}">${html(s.name)}</button><small>${html(s.district)} · ${html(s.id)}</small>${s.registryStatus!=='listed'?'<small>僅教育部紀錄，尚未配對市府名錄</small>':''}</td><td>${show(s.type)}<small>${show(s.serviceType)}</small></td><td>${show(s.address)}<small>${show(s.telephone)}</small></td><td>${show(s.registrationNumber)}</td><td>${show(s.capacity)}${s.capacity==null?'':' 人'}</td><td>${show(s.monthlyFee)}${s.monthlyFee==null?'':' 元／生／月'}</td><td>${s.evaluations.length} 筆<button class="link" data-school="${i}">查看資料與報告</button></td></tr>`).join('')||'<tr><td colspan="7">沒有符合條件的園所，請調整搜尋或行政區。</td></tr>'}
-      </tbody></table></div><div class="pad toolbar"><button id="real-prev" ${state.busy||!result.page?'disabled':''}>上一頁</button><button id="real-next" ${state.busy||!result.hasNext?'disabled':''}>下一頁</button><label>每頁 <select id="real-size">${[10,25,50,100].map(n=>`<option ${state.size===n?'selected':''}>${n}</option>`).join('')}</select> 筆</label></div></div>`;
-    target.querySelectorAll('[data-school]').forEach(b=>b.onclick=()=>detail(result.data[Number(b.dataset.school)]));
-    target.querySelector('#real-prev').onclick=()=>{state.page--;load();};
-    target.querySelector('#real-next').onclick=()=>{state.page++;load();};
-    target.querySelector('#real-size').onchange=e=>{state.size=Number(e.target.value);state.page=0;load();};
-  }
-  function detail(s) {
-    reportRequest++;
-    const metadata=s.fieldMetadata;
-    openModal(html(s.name),`<p>${html(s.district)} · ${html(s.id)}</p><div class="table-wrap"><table><thead><tr><th>欄位</th><th>內容</th><th>資料說明</th></tr></thead><tbody>${Object.entries(metadata).filter(([k])=>k!=='evaluations').map(([k,v])=>`<tr><th>${html(v.label)}</th><td>${show(s[k])}${s[k]!=null&&v.unit?' '+html(v.unit):''}</td><td>${html(v.note||({ntpc:'新北市政府名錄',moe:'教育部全國教保資訊網'}[v.source]||''))}</td></tr>`).join('')}</tbody></table></div>
-      <h2 style="margin-top:22px">評鑑歷史與公開報告</h2><p class="muted">${html(metadata.evaluations.note||'保留最新及前期評鑑；紀錄日期依來源顯示。')}${s.historyComplete?'':' 歷史尚未完整配對。'}</p>
-      ${s.evaluations.map((e,i)=>`<article class="source-card"><h3>${show(e.year)} 學年度 · ${html(e.result)}</h3><p>完成日：${show(e.date)}</p><div class="toolbar">${e.reportStatus==='downloaded'&&reportLink(e.reportPath)?`<button class="primary" data-report="${i}">查看已下載報告</button><a href="${html(e.reportPath)}" download>下載 JSON</a>`:`<span>${html({failed:'報告下載失敗，可重新執行爬蟲',pending:'報告待下載',not_published:'來源未公開報告'}[e.reportStatus]||'未提供報告')}</span>`}${sourceLink(e.reportUrl)?`<a href="${sourceLink(e.reportUrl)}" target="_blank" rel="noopener noreferrer">官方報告 ↗</a>`:''}</div></article>`).join('')||'<p class="notice">沒有已配對的公開評鑑紀錄；不代表低風險或未受評。</p>'}
-      <h2 style="margin-top:22px">來源紀錄</h2>${s.sources.map(src=>`<details><summary>${html(src.id==='ntpc'?'新北市政府名錄':'教育部園所資料')}</summary><pre style="white-space:pre-wrap">${html(JSON.stringify(src.record,null,2))}</pre><a href="${sourceLink(src.url)||'#'}" target="_blank" rel="noopener noreferrer">官方來源 ↗</a></details>`).join('')}`);
-    document.querySelector('#modal').classList.add('modal-wide');
-    document.querySelectorAll('[data-report]').forEach(b=>b.onclick=()=>viewReport(s,s.evaluations[Number(b.dataset.report)]));
-  }
-  async function viewReport(s,e) {
-    const sequence=++reportRequest;
-    try {
-      const response=await fetch(reportLink(e.reportPath));
-      if(!response.ok)throw Error('找不到報告檔案');
-      const report=await response.json();
-      if(sequence!==reportRequest)return;
-      if(report.schoolName!==(e.sourceSchoolName||s.name))throw Error('報告園所名稱不一致');
-      openModal(html(s.name+' · '+e.year+' 學年度評鑑報告'),`<p>${html(e.result)} · ${show(e.date)}</p><p class="muted">下載時間：${html(report.retrievedAt)} · 官方網頁檢核表</p><div class="toolbar" style="margin:14px 0"><button id="real-back">返回園所資料</button><a href="${html(e.reportPath)}" download>下載結構化 JSON</a></div>${report.tables.map(rows=>`<div class="table-wrap" style="margin:18px 0"><table class="real-report-table">${rows.map(row=>'<tr>'+row.map(c=>`<td rowspan="${Math.max(1,Math.min(100,Number(c.rowSpan)||1))}" colspan="${Math.max(1,Math.min(20,Number(c.colSpan)||1))}">${html(c.text)}</td>`).join('')+'</tr>').join('')}</table></div>`).join('')}`);
-      document.querySelector('#modal').classList.add('modal-wide');
-      document.querySelector('#real-back').onclick=()=>detail(s);
-    } catch(error) {if(sequence===reportRequest)toast('讀取報告失敗：'+error.message);}
-  }
-  window.officialSchoolDetail=id=>{const s=schools.find(s=>s.id===Number(id));if(s?.officialId)detail({...s,id:s.officialId});};
-  page='data';render();
+  window.locateSchool=id=>{const s=findSchool(id);if(!s||!hasCoords(s))return;if(page!=='overview')go('overview');if(typeof leafMap!=='undefined'&&leafMap){leafMap.flyTo([s.lat,s.lng],16,{duration:.8});setTimeout(()=>showPopup(s.id),900)}};
+
+  fetch(API,{headers:{accept:'application/json'}}).then(r=>r.ok?r.json():Promise.reject(r.status)).then(body=>{
+    const rows=Array.isArray(body)?body:Array.isArray(body?.data)?body.data:[];
+    real=rows.map(normalize).filter(s=>s.name&&hasCoords(s));
+    if(!real.length)return;
+    mode='real';
+    const top=document.querySelector('.topline .demo');if(top)top.textContent=`真實園所 ${real.length} 間（教育部教保資訊網）· 分數僅供查核排序`;
+    if(page==='overview')overview();
+  }).catch(e=>console.info('園所 API 未就緒，使用示範資料：',e));
 })();

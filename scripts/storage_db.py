@@ -129,7 +129,7 @@ def init_db(db_path=None):
                     # 2. 人工覆核紀錄表
                     cursor.execute("""
                         CREATE TABLE IF NOT EXISTS reviews (
-                            school_id INTEGER PRIMARY KEY,
+                            school_id BIGINT PRIMARY KEY,
                             status VARCHAR(64),
                             owner VARCHAR(64),
                             date VARCHAR(32),
@@ -143,7 +143,7 @@ def init_db(db_path=None):
                     # 3. 稽核案件表
                     cursor.execute("""
                         CREATE TABLE IF NOT EXISTS cases (
-                            school_id INTEGER PRIMARY KEY,
+                            school_id BIGINT PRIMARY KEY,
                             stage VARCHAR(64),
                             agency VARCHAR(64),
                             owner VARCHAR(64),
@@ -154,6 +154,8 @@ def init_db(db_path=None):
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         );
                     """)
+                    cursor.execute("ALTER TABLE reviews ALTER COLUMN school_id TYPE BIGINT")
+                    cursor.execute("ALTER TABLE cases ALTER COLUMN school_id TYPE BIGINT")
                 conn.commit()
 
             # 檢查 RDS 是否為空，若為空且本地 SQLite 有歷史資料則自動遷移
@@ -219,19 +221,19 @@ def _auto_migrate_if_needed():
         logger.warning(f"自動資料庫遷移檢查發生異常: {e}")
 
 
-def save_state(state_dict, db_path=None):
+def save_state(state_dict, db_path=None, state_key="db_state"):
     """將完整狀態字典存入資料庫（優先 RDS，備援 SQLite）。"""
     cfg = get_rds_config()
     if cfg["enabled"]:
         try:
-            return _save_state_rds(state_dict)
+            return _save_state_rds(state_dict, state_key)
         except Exception as e:
             logger.warning(f"RDS 儲存失敗，降級存至 SQLite: {e}")
-            return _save_state_sqlite(state_dict, db_path)
-    return _save_state_sqlite(state_dict, db_path)
+            return _save_state_sqlite(state_dict, db_path, state_key)
+    return _save_state_sqlite(state_dict, db_path, state_key)
 
 
-def _save_state_rds(state_dict):
+def _save_state_rds(state_dict, state_key="db_state"):
     init_db()
     with get_rds_connection() as conn:
         with conn.cursor() as cursor:
@@ -242,7 +244,7 @@ def _save_state_rds(state_dict):
                 ON CONFLICT (key) DO UPDATE SET
                     value = EXCLUDED.value,
                     updated_at = CURRENT_TIMESTAMP
-            """, ('db_state', json_str))
+            """, (state_key, json_str))
 
             # 同步 reviews
             reviews = state_dict.get("reviews", {})
@@ -311,17 +313,17 @@ def _save_state_rds(state_dict):
     return True
 
 
-def _save_state_sqlite(state_dict, db_path=None):
+def _save_state_sqlite(state_dict, db_path=None, state_key="db_state"):
     with get_sqlite_connection(db_path) as conn:
         cursor = conn.cursor()
         json_str = json.dumps(state_dict, ensure_ascii=False)
         cursor.execute("""
             INSERT INTO app_state (key, value, updated_at)
-            VALUES ('db_state', ?, CURRENT_TIMESTAMP)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(key) DO UPDATE SET
                 value = excluded.value,
                 updated_at = CURRENT_TIMESTAMP
-        """, (json_str,))
+        """, (state_key, json_str))
 
         reviews = state_dict.get("reviews", {})
         if isinstance(reviews, dict):
@@ -388,14 +390,14 @@ def _save_state_sqlite(state_dict, db_path=None):
     return True
 
 
-def get_state(db_path=None):
+def get_state(db_path=None, state_key="db_state"):
     """讀取狀態（優先 RDS，備援 SQLite）。"""
     cfg = get_rds_config()
     if cfg["enabled"]:
         try:
             with get_rds_connection() as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("SELECT value, updated_at FROM app_state WHERE key = 'db_state'")
+                    cursor.execute("SELECT value, updated_at FROM app_state WHERE key = %s", (state_key,))
                     row = cursor.fetchone()
                     if row and row[0]:
                         try:
@@ -410,7 +412,7 @@ def get_state(db_path=None):
 
     with get_sqlite_connection(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT value, updated_at FROM app_state WHERE key = 'db_state'")
+        cursor.execute("SELECT value, updated_at FROM app_state WHERE key = ?", (state_key,))
         row = cursor.fetchone()
         if row and row["value"]:
             try:
@@ -421,28 +423,25 @@ def get_state(db_path=None):
     return {"exists": False, "data": None, "backend": "SQLite"}
 
 
-def reset_db(db_path=None):
-    """清空資料庫重設為初始狀態。"""
-    cfg = get_rds_config()
-    if cfg["enabled"]:
-        try:
-            with get_rds_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM app_state")
-                    cursor.execute("DELETE FROM reviews")
-                    cursor.execute("DELETE FROM cases")
-                conn.commit()
-            logger.info("AWS RDS 資料庫已重設")
-            return True
-        except Exception as e:
-            logger.warning(f"RDS 重設失敗，切換 SQLite: {e}")
-
-    with get_sqlite_connection(db_path) as conn:
+def reset_db(db_path=None, state_key="db_state"):
+    """Reset only the selected workspace; other workspace records remain intact."""
+    state = get_state(db_path, state_key=state_key).get("data") or {}
+    reviews = [int(key) for key in state.get("reviews", {}) if str(key).isdigit()]
+    cases = [int(key) for key in state.get("casework", {}) if str(key).isdigit()]
+    def clear(conn, placeholder):
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM app_state")
-        cursor.execute("DELETE FROM reviews")
-        cursor.execute("DELETE FROM cases")
+        cursor.execute(f"DELETE FROM app_state WHERE key = {placeholder}", (state_key,))
+        for key in reviews:
+            cursor.execute(f"DELETE FROM reviews WHERE school_id = {placeholder}", (key,))
+        for key in cases:
+            cursor.execute(f"DELETE FROM cases WHERE school_id = {placeholder}", (key,))
         conn.commit()
+    if get_rds_config()["enabled"]:
+        with get_rds_connection() as conn:
+            clear(conn, "%s")
+    else:
+        with get_sqlite_connection(db_path) as conn:
+            clear(conn, "?")
     return True
 
 
@@ -523,7 +522,7 @@ def migrate_sqlite_to_rds(sqlite_path=None):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             CREATE TABLE IF NOT EXISTS reviews (
-                school_id INTEGER PRIMARY KEY,
+                school_id BIGINT PRIMARY KEY,
                 status VARCHAR(64),
                 owner VARCHAR(64),
                 date VARCHAR(32),
@@ -534,7 +533,7 @@ def migrate_sqlite_to_rds(sqlite_path=None):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             CREATE TABLE IF NOT EXISTS cases (
-                school_id INTEGER PRIMARY KEY,
+                school_id BIGINT PRIMARY KEY,
                 stage VARCHAR(64),
                 agency VARCHAR(64),
                 owner VARCHAR(64),
@@ -545,6 +544,9 @@ def migrate_sqlite_to_rds(sqlite_path=None):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+
+        r_cur.execute("ALTER TABLE reviews ALTER COLUMN school_id TYPE BIGINT")
+        r_cur.execute("ALTER TABLE cases ALTER COLUMN school_id TYPE BIGINT")
 
         # 1. 遷移 app_state
         s_cur.execute("SELECT key, value, updated_at FROM app_state")

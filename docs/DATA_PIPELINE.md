@@ -76,7 +76,7 @@ GET /api/schools?page=0&size=25&q=莒光&district=板橋區&type=公立
 }
 ```
 
-回應形狀由原本陣列改為分頁物件；舊消費端可暫用 `GET /api/schools?format=legacy` 取得完整陣列。`mode=demo` 保留 `use_demo` 回應。`GET /api/insights` 只提供真實資料統計，不再輸出推估風險敘述。
+未帶分頁／篩選參數的 `GET /api/schools` 保留原本陣列格式；帶 `page`、`size`、`q`、`district` 或 `type` 則回傳分頁物件。`format=legacy` 可明確要求完整陣列。`mode=demo` 保留 `use_demo` 回應。`GET /api/insights` 只提供真實資料統計，不再輸出推估風險敘述。
 
 `POST /api/crawl-live` 保留即時抽樣能力，`pages` 上限 5；回傳當次教育部欄位與歷史，不寫入全量快照、不下載報告。完整更新使用 CLI。
 
@@ -116,3 +116,10 @@ python3 -m unittest discover -s tests -v
 ```
 
 測試使用政府頁面的固定樣本，不對外發出請求，涵蓋歷史、日期、報告、配對、缺值、分頁、搜尋和來源格式異常。
+
+
+## 與原有功能整合
+
+`preview.html` 保留 main 的登入、Leaflet 地圖、示範資料和 P1 工作流程；`?dataset=official` 啟用官方模式，透過原有來源模型與規則引擎連接工作台、風險詳情和稽核案件。官方未提供地理座標，地圖僅呈現行政區，不生成假的園所位置。
+
+原有 risk API 預設行為不變。官方模式呼叫 `?workspace=official`，使用獨立儲存鍵並採用不推估缺值的官方評估器。`/api/workspace` 回傳共用快照。上傳補充評鑑、OCR、輿情及案件回填等原有操作仍可使用，其 AI 模擬結果沿用原本標示。

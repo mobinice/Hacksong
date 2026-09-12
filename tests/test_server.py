@@ -19,11 +19,11 @@ class APITests(unittest.TestCase):
             (data/'crawl_metadata.json').write_text('{"partial": false}')
             for path,expected in [('/api/schools?page=0&size=1',200),('/api/schools?size=101',400),('/api/schools?format=legacy',200),('/api/schools?mode=demo',200)]:
                 handler=object.__new__(server.RadarAPIHandler)
-                handler.path=path;handler.wfile=io.BytesIO();status=[]
+                handler.command="GET";handler._allow_request=lambda:True;handler.path=path;handler.wfile=io.BytesIO();status=[]
                 handler.send_response=status.append
                 handler.send_header=lambda *args: None
                 handler.end_headers=lambda: None
-                with patch.object(server, 'BASE_DIR', directory):handler.do_GET()
+                with patch.object(server, 'BASE_DIR', Path(directory)):handler.do_GET()
                 self.assertEqual(status,[expected])
                 payload=json.loads(handler.wfile.getvalue())
                 if 'size=1' in path and expected==200:
@@ -35,7 +35,7 @@ class APITests(unittest.TestCase):
     def test_missing_snapshot_is_service_unavailable(self):
         with tempfile.TemporaryDirectory() as directory:
             handler=object.__new__(server.RadarAPIHandler)
-            handler.path='/api/schools';handler.wfile=io.BytesIO();status=[]
+            handler.command='GET';handler._allow_request=lambda:True;handler.path='/api/workspace';handler.wfile=io.BytesIO();status=[]
             handler.send_response=status.append;handler.send_header=lambda *args: None;handler.end_headers=lambda: None
-            with patch.object(server,'BASE_DIR',directory):handler.do_GET()
+            with patch('server.load_workspace_schools',side_effect=OSError):handler.do_GET()
             self.assertEqual(status,[503])

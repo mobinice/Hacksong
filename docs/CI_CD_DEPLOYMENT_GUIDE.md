@@ -6,9 +6,9 @@
 
 ## 1. 伺服器與架構資訊
 
-- **雲端平台**：AWS (帳號: `112803415298`)
+- **雲端平台**：AWS（帳號 ID 不寫入版本庫）
 - **區域 (Region)**：`us-west-2` (奧勒岡)
-- **執行個體 (Instance ID)**：`i-0bddfc7b03f4e232e`
+- **執行個體 (Instance ID)**：由 AWS Console 或部署環境查詢
 - **規格**：`t3.medium`（Ubuntu 24.04 LTS，30GB gp3）
 - **公開 IP (Public IP)**：`54.191.62.21`
 - **公開網址**：[http://54.191.62.21/](http://54.191.62.21/)
@@ -43,7 +43,7 @@ GitHub Actions 監聽以下條件觸發自動部署：
 | `EC2_HOST` | EC2 主機公開 IP | `54.191.62.21` |
 | `EC2_USER` | SSH 登入使用者 | `ubuntu` |
 | `EC2_TARGET_DIR` | 伺服器部署目標路徑 | `/var/www/youan-radar` |
-| `EC2_SSH_KEY` | SSH 私鑰 (PEM) | 自動自 `~/.ssh/youan-radar-key.pem` 寫入 |
+| `EC2_SSH_KEY` | SSH 私鑰 (PEM) | 僅存於 GitHub Actions Secret，不寫入檔案或文件 |
 
 ---
 
@@ -91,7 +91,7 @@ git push origin --tags
 
 ```bash
 # 透過 SSH 登入主機
-ssh -i ~/.ssh/youan-radar-key.pem ubuntu@54.191.62.21
+ssh -i /path/to/private-key.pem ubuntu@54.191.62.21
 
 # 查看 Nginx 狀態
 sudo systemctl status nginx

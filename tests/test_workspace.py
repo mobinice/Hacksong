@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from scripts import workspace_data as workspace, storage_db
-from scripts.risk_engine import evaluate_school_risk, recalculate_all_schools
+from scripts.official_risk import evaluate_school_risk, recalculate_all_schools
 
 
 class WorkspaceTests(unittest.TestCase):
@@ -51,5 +51,16 @@ class WorkspaceTests(unittest.TestCase):
             restored=storage_db.get_state()['data']
             self.assertEqual(restored['reviews'][str(key)]['status'],'資料不足待補充')
             self.assertEqual(restored['casework'][str(key)]['stage'],'待處理')
+
+class NamespaceTests(unittest.TestCase):
+    def test_saving_and_resetting_one_workspace_preserves_the_other(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict('os.environ',{'RDS_HOST':'','DB_HOST':''}), patch.object(storage_db,'SQLITE_DB_PATH',str(Path(directory)/'test.db')):
+            storage_db.init_db()
+            storage_db.save_state({'reviews':{'0':{'status':'demo'}}})
+            storage_db.save_state({'reviews':{'273215967507972':{'status':'official'}}},state_key='ntpc_official')
+            self.assertEqual(storage_db.get_state()['data']['reviews']['0']['status'],'demo')
+            storage_db.reset_db()
+            self.assertFalse(storage_db.get_state()['exists'])
+            self.assertEqual(storage_db.get_state(state_key='ntpc_official')['data']['reviews']['273215967507972']['status'],'official')
 
 if __name__=='__main__':unittest.main()

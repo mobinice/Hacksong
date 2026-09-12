@@ -52,6 +52,8 @@ def load_workspace_schools(state=None):
                 chosen = next((c for c in record.get('candidates', []) if c['id'] == record.get('chosen')), None)
                 if chosen:
                     s[field] = chosen.get('value')
+                elif not str(record.get('chosen','')).startswith('official-'):
+                    s[field] = None
         schools.append(s)
     for imported in state.get('importedSchools', []):
         if imported['id'] not in ids:
