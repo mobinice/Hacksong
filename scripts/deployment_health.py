@@ -17,8 +17,8 @@ def check(base_url, attempts=12, delay=3, timeout=5):
                         raise ValueError(f'{path}: HTTP {response.status}')
                     return response.read().decode('utf-8')
             frontend=fetch('/preview.html')
-            if 'assets/official-workspace.js' not in frontend:
-                raise ValueError('Frontend does not include the official workspace')
+            if 'assets/youan-p0.js' not in frontend:
+                raise ValueError('Frontend does not include the risk demo')
             health=json.loads(fetch('/api/health'))
             if health.get('status')!='ok':
                 raise ValueError('API is not healthy')

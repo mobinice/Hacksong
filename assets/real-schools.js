@@ -1,8 +1,7 @@
 /* Public school identity + explicitly labelled demo financial scenarios.
    All pages use Y's shared source records and scoring engine. */
 (() => {
-  if(window.officialMode)return;
-  const API=(typeof API_BASE==='string'?API_BASE:'')+'/api/schools';
+  const API='data/map_demo_schools.json';
   const DIMS=[['compliance','法遵／裁罰／評鑑'],['finance','財務／收費'],['consistency','資料／營運一致性'],['sentiment','輿情預警']];
   let real=[],mode='demo';
   function normalize(r){
@@ -40,16 +39,10 @@
     const card=document.querySelector('.detail-grid .panel');
     card.insertAdjacentHTML('afterend',`<section class="panel"><div class="panel-head"><h2>教育部評鑑紀錄</h2><button onclick="Y.evaluations(${esc(JSON.stringify(s.id))})">查看／上傳／下載評鑑</button></div><div class="pad real-detail">${s.evaluations.map(e=>`<p>${esc(e.year||'')} 學年度：${esc(e.result||'')}${e.date?'（'+esc(e.date)+'）':''}</p>`).join('')||'<p class="muted">公開資料尚無評鑑紀錄，可上傳文件補充。</p>'}<div class="domains">${s.domains.map(d=>`<span class="${d.status==='failed'?'failed':''}">${esc(d.name)}：${esc(d.label||'')}</span>`).join('')}</div><small>來源：教育部全國教保資訊網；財務與事件分數另採 Demo 情境資料。</small></div></section>`);
   };
-  fetch(API,{headers:{accept:'application/json'}}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(async body=>{
-    const rows=Array.isArray(body)?body:body.data||[];
-    if(!rows.some(r=>Array.isArray(r.coordinates)&&r.coordinates.every(v=>v!=null)||r.lat!=null&&r.lng!=null)){
-      const snapshot=await fetch('data/map_demo_schools.json');
-      if(!snapshot.ok)throw Error('Map snapshot unavailable');
-      body=await snapshot.json();
-    }
+  fetch(API,{headers:{accept:'application/json'}}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(body=>{
     real=(Array.isArray(body)?body:body.data||[]).map(normalize).filter(s=>s.name&&hasCoords(s));if(!real.length)return;
     Y.registerExternalSchools(real);mode='real';
-    document.querySelector('.topline .demo').textContent=`園所地圖快照 ${real.length} 間 · 財務／事件為示範試算`;
+    document.querySelector('.topline .demo').textContent=`公開園所 ${real.length} 間 · 財務／事件為示範試算`;
     render();
   }).catch(e=>console.info('園所 API 未就緒，使用示範資料：',e));
 })();

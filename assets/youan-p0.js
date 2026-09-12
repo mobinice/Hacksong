@@ -41,7 +41,7 @@
   const clone = x => structuredClone(x);
   db.p0 ||= {data:{},year:'2025',assessments:{},history:[],revision:0};
   let model = db.p0;
-  let workQuery='',workDistrict='',workState='',workPageIndex=0,workSelected=new Set(), workColumns=['capacity','studentCount','penaltyCount','evaluationResult','staffCostPerStudent','staffCost','revenue'];
+  let workQuery='',workDistrict='',workState='',workSelected=new Set(), workColumns=['capacity','studentCount','penaltyCount','evaluationResult','staffCostPerStudent','staffCost','revenue'];
   let draftRules=null;
   const records = (id,year=model.year) => model.data[id]?.[year] || {};
   function addObservation(id,year,key,value,source,locator,excerpt,at=now()) {
@@ -64,7 +64,7 @@
   }
   function val(id,key) { const r=records(id)[key]; return r?.conflict ? undefined : current(id,key)?.value; }
   function seed() {
-    if(window.officialMode||model.seeded)return;
+    if(model.seeded)return;
     for(const s of schools.filter(s=>!s.imported)) {
       const n=s.id, count=100+n*3;
       const values={capacity:s.capacity,studentCount:count,sourceStudentCount:n%3===0?Math.round(count*1.25):count,previousStudentCount:Math.round(count/1.05),penaltyCount:n<5?2:n<12?1:0,evaluationResult:n<5?'待改善':'符合',tuition:5000,revenue:n<5?9200000:count*60000,staffCost:n<7?count*146000:count*80000,previousStaffCost:n<7?Math.round(count*146000/1.4):Math.round(count*80000/1.03),signalCount:n<3?10:2,signalBaseline:2};
@@ -101,7 +101,7 @@
       return {ruleId:r.id,name:r.name,dimension:r.dimension,weight:r.weight,threshold:r.threshold,enabled:false,raw:0,contribution:0,hit:false,formula:'規則已停用，不參與計算',observed:'規則已停用',thresholdStr:`門檻 ${display(r.threshold)}`,keys:[],missing:[],action:'規則未啟用'};
     }
     const keys=required[r.id]||[],v=Object.fromEntries(keys.map(k=>[k,val(s.id,k)]));
-    const missing=keys.filter(k=>val(s.id,k)===undefined||val(s.id,k)===null||val(s.id,k)==='');
+    const missing=keys.filter(k=>val(s.id,k)===undefined||val(s.id,k)==='');
     let metric=null,hit=false,formula='',problem='',observed='',thresholdStr='',compare=null;
     if(missing.length){
       problem='待補齊／確認：'+missing.map(label).join('、');
@@ -216,10 +216,7 @@
         }
       }
       const totalScore = round(Object.values(dimScores).reduce((a,b)=>a+b,0));
-      const weights=rows.filter(r=>r.enabled&&required[r.ruleId]);
-      const weight=weights.reduce((n,r)=>n+r.weight,0);
-      const coverage = window.officialMode?(weight?round(weights.filter(r=>r.raw!==null).reduce((n,r)=>n+r.weight,0)/weight*100):0):s.complete;
-      if(window.officialMode)s.complete=coverage;
+      const coverage = s.complete;
       const isIncomplete = coverage < 60; // 防呆規則：完整度 < 60% 獨立標記為資料不足
       const anomalies = rows.filter(r=>r.hit).length;
 
@@ -375,7 +372,7 @@
   detail=()=>{
     oldDetail();const s=schoolById(selected),a=assessment(s),host=$('.detail-grid>div');
     const header=$('.heading');header.querySelector('p').textContent=`${s.type} · ${s.district} · 核定 ${display(val(s.id,'capacity'))} 人`;
-    header.querySelector('p:last-child').textContent=s.address+(s.external?' · 基本資料為公開資料；財務與事件分數為示範試算':(s.imported||s.officialId)?'':'（合成示範地址）');
+    header.querySelector('p:last-child').textContent=s.address+(s.external?' · 基本資料為公開資料；財務與事件分數為示範試算':s.imported?'':'（合成示範地址）');
     const bAdv=db.bedrockAdvice?.[s.id];
     const bedrockAdvicePanel = `<div class="panel"><div class="panel-head"><div><h2>AI 輔助查核建議</h2><p>${bAdv?'由 AWS Bedrock (Amazon Nova) 深度分析生成，可勾選現場查核項目。':'依上方風險整理的建議，可勾選已確認項目。'}</p></div><div style="display:flex;gap:8px;align-items:center">${bAdv?'<span class="pill" style="background:#edf6f1;color:#287a60;font-weight:600">⚡ AWS Bedrock</span>':'<span class="pill">待人工確認</span>'}<button class="link" style="font-size:12px;" onclick="generateBedrockAdvice(${esc(JSON.stringify(s.id))},true)">${bAdv?'🔄 重新生成':'✨ 啟用 Bedrock 深度分析'}</button></div></div><div class="pad">${bedrockLoading?`<div class="loading" style="padding:28px 20px"><div class="spinner"></div><p style="margin-top:12px;font-size:13px;color:var(--blue);font-weight:600">AWS Bedrock (Amazon Nova) 深度歸因分析中...</p><small>比對教保法規、違規歷史與同儕財務指標以產出專屬工作清單</small></div>`:bAdv?`<div class="notice" style="background:#f0f5fa;border-left:4px solid var(--blue);margin-bottom:18px"><strong>🎯 查核核心焦點：</strong>${esc(bAdv.summary)}<div style="margin-top:6px;font-size:12px"><span class="pill ${bAdv.priorityLevel?.includes('高')?'high':'mid'}">查核優先度：${esc(bAdv.priorityLevel||'高優先')}</span></div></div>${(bAdv.suggestedActions||[]).map((act,i)=>`<div style="margin-bottom:20px;border-bottom:1px dashed var(--line);padding-bottom:16px"><h3 style="display:flex;align-items:center;gap:8px;font-size:15px"><span class="number">${i+1}</span> ${esc(act.title)}</h3><p style="font-size:12px;color:var(--muted);margin:4px 0 10px">${esc(act.reason)}</p><strong style="font-size:12px;color:var(--blue);display:block;margin:8px 0 4px">🔍 現場查核清單 (Checklist)：</strong>${(act.checklist||[]).map((item,j)=>`<label class="check"><input type="checkbox" ${db.reviews[s.id]?.checks?.includes('b-'+i+'-'+j)?'checked':''} onchange="saveCheck('b-${i}-${j}',this.checked)"><span>${esc(item)}</span></label>`).join('')}${act.requiredDocuments&&act.requiredDocuments.length?`<div style="background:#fafcfe;border:1px solid #dce6f0;border-radius:6px;padding:10px 14px;margin-top:10px"><strong style="font-size:12px;color:#92541f">📋 建議現場調閱之公文與表冊清單：</strong><ul style="margin:6px 0 0 18px;padding:0;font-size:12px;color:var(--ink)">${act.requiredDocuments.map(doc=>`<li>${esc(doc)}</li>`).join('')}</ul></div>`:''}</div>`).join('')}<div class="notice" style="margin-top:14px;font-size:11px">${esc(bAdv.complianceNotice||'AI 分析內容僅供稽查排序及輔助判斷，不作為違法認定或行政裁處之直接依據。')}</div>`:`<div style="text-align:center;padding:16px 20px;background:#f4f7fb;border:1px dashed #8fb6dd;border-radius:8px;margin-bottom:18px"><p style="font-size:14px;font-weight:600;color:var(--blue);margin-bottom:6px">🤖 啟用 AWS Bedrock 智能查核專家分析</p><p style="font-size:12px;color:var(--muted);margin-bottom:14px">調用 Amazon Nova 大語言模型，針對此園所特定違規事由與異常指標進行深度歸因，自動產出專屬查核清單與調閱表冊。</p><button class="primary" onclick="generateBedrockAdvice(${esc(JSON.stringify(s.id))},true)">✨ 立即產生專屬查核建議與公文清單 (AWS Bedrock)</button></div>${a.rows.filter(r=>r.hit).map(r=>`<label class="check"><input type="checkbox" ${db.reviews[s.id]?.checks?.includes(r.ruleId)?'checked':''} onchange="saveCheck('${r.ruleId}',this.checked)">${esc(r.action)}</label>`).join('')||'<p>先補齊資料並確認來源。</p>'}`}`;
 
@@ -605,17 +602,16 @@
   const nav=document.createElement('button');nav.id='nav-data';nav.textContent='▤　園所資料工作台';nav.onclick=()=>go('data');$('nav').prepend(nav);
   function availableFields(){return [...new Set(['staffCostPerStudent',...allImportFields.map(f=>f[0]),...Object.values(model.data).flatMap(ys=>Object.values(ys).flatMap(r=>Object.keys(r)))])].filter(k=>!['name','district','address','type','schoolId','year'].includes(k));}
   function sourceState(s){const rr=Object.values(records(s.id));return rr.some(r=>r.conflict)?'conflict':assessment(s).coverage<60?'missing':'ready';}
-  function workRows(){return activeSchools().filter(s=>(!workQuery||workspaceMatches(s,workQuery)||(s.name+s.address+`${esc(s.officialId||('YA-'+String(s.id+1).padStart(4,'0')))}`).includes(workQuery))&&(!workDistrict||s.district===workDistrict)&&(!workState||sourceState(s)===workState));}
+  function workRows(){return activeSchools().filter(s=>(!workQuery||(s.name+s.address+`${caseNumber(s.id)}`).includes(workQuery))&&(!workDistrict||s.district===workDistrict)&&(!workState||sourceState(s)===workState));}
   Y.refreshWork=()=>{if(page==='data')renderWorkRows();};
   Y.year=y=>{model.year=y;workSelected.clear();recalc('切換年度');persist();render();};
-  Y.workFilter=(key,v)=>{workPageIndex=0;if(key==='q')workQuery=v;if(key==='district')workDistrict=v;if(key==='state')workState=v;renderWorkRows();};
+  Y.workFilter=(key,v)=>{if(key==='q')workQuery=v;if(key==='district')workDistrict=v;if(key==='state')workState=v;renderWorkRows();};
   Y.column=(k,on)=>{workColumns=on?[...new Set([...workColumns,k])]:workColumns.filter(x=>x!==k);renderWorkRows();};
   Y.select=(id,on)=>{on?workSelected.add(id):workSelected.delete(id);updateSelection();};
   Y.selectAll=on=>{for(const s of workRows())on?workSelected.add(s.id):workSelected.delete(s.id);renderWorkRows();};
   function updateSelection(){if($('#selection-count'))$('#selection-count').textContent=`已選取 ${workSelected.size} 間園所`;}
-  function workPage(){const years=[...new Set([window.officialMode?'最新快照':'2025',...Object.values(model.data).flatMap(y=>Object.keys(y))])].sort().reverse();$('#page').innerHTML=`<div class="heading"><div><div class="eyebrow">資料整合 · 可追溯分析</div><h1>園所資料工作台</h1><p>不同來源歸戶到同一園所，先確認資料，再找出異常。</p></div><div class="work-heading"><button onclick="tab='import';go('settings')">＋ 匯入資料</button><button class="primary sheet-export" onclick="Y.exportExcel()">匯出所選 Excel</button></div></div><div class="p0-help">每個數值都可查看來源與原文。來源衝突需人工確認，缺資料不當成 0；${window.officialMode?'官方資料快照；評鑑使用最近公開結果，原始日期與學年度保留於來源。':'目前為本機原型，示範數據皆為合成。'}</div><div class="metrics"><div class="metric"><span>整合園所</span><strong>${activeSchools().length}</strong><small>使用穩定園所識別碼</small></div><div class="metric"><span>待確認來源衝突</span><strong>${activeSchools().filter(s=>sourceState(s)==='conflict').length}</strong><small>保留所有來源，不直接覆寫</small></div><div class="metric"><span>有已知異常</span><strong>${activeSchools().filter(s=>assessment(s).anomalies>0).length}</strong><small>異常可查看計算與來源</small></div><div class="metric"><span>資料不足</span><strong>${activeSchools().filter(s=>assessment(s).coverage<60).length}</strong><small>與已知異常分開呈現</small></div></div><div class="panel"><div class="work-controls"><input class="search" aria-label="搜尋資料工作台" placeholder="園所名稱、地址或識別碼" value="${esc(workQuery)}" oninput="Y.workFilter('q',this.value)"><select aria-label="工作台行政區" onchange="Y.workFilter('district',this.value)">${options(['全部行政區',...districts],workDistrict,true)}</select><select aria-label="資料年度" onchange="Y.year(this.value)">${options(years,model.year)}</select><select aria-label="資料狀態" onchange="Y.workFilter('state',this.value)">${[['','全部資料狀態'],['conflict','来源衝突'],['missing','資料不足'],['ready','可評估']].map(([v,t])=>`<option value="${v}" ${v===workState?'selected':''}>${t}</option>`).join('')}</select></div><details><summary class="pad">選擇顯示與匯出欄位</summary><div class="column-picker">${availableFields().map(k=>`<label><input type="checkbox" ${workColumns.includes(k)?'checked':''} onchange="Y.column('${k}',this.checked)"> ${esc(label(k))}</label>`).join('')}</div></details><div class="panel-head"><span id="selection-count"></span><small>Excel 包含資料、來源明細、評分明細三張工作表</small></div><div id="work-results" class="table-wrap"></div></div>`;renderWorkRows();}
-  Y.workNext=delta=>{workPageIndex+=delta;renderWorkRows();};
-  function renderWorkRows(){const all=workRows();workPageIndex=Math.max(0,Math.min(workPageIndex,Math.ceil(all.length/25)-1));const rows=window.officialMode?all.slice(workPageIndex*25,(workPageIndex+1)*25):all;$('#work-results').innerHTML=`<table class="work-table"><thead><tr><th><input type="checkbox" aria-label="全選目前園所" ${rows.length&&rows.every(s=>workSelected.has(s.id))?'checked':''} onchange="Y.selectAll(this.checked)"></th><th>園所／年度</th>${workColumns.map(k=>`<th>${esc(label(k))}</th>`).join('')}<th>異常／完整度</th></tr></thead><tbody>${rows.map(s=>`<tr><td><input type="checkbox" aria-label="選取${esc(s.name)}" ${workSelected.has(s.id)?'checked':''} onchange="Y.select(${esc(JSON.stringify(s.id))},this.checked)"></td><td><button class="link" onclick="go('detail',${esc(JSON.stringify(s.id))})">${esc(s.name)}</button><br><small>${esc(s.officialId||('YA-'+String(s.id+1).padStart(4,'0')))} · ${esc(s.district)} · ${esc(model.year)}</small></td>${workColumns.map(k=>{const c=current(s.id,k),r=records(s.id)[k];return `<td><button class="value-link" onclick="Y.source(${esc(JSON.stringify(s.id))},'${k}')">${esc(display(c?.value))}<small>${r?.conflict?'⚠ 來源衝突':c?'查看來源 ↗':'尚無資料'}</small></button></td>`;}).join('')}<td><span class="${assessment(s).anomalies?'high':'muted'}">${assessment(s).anomalies} 項異常</span><br><strong>${s.complete<60?'待補':assessment(s).score+' 分'}</strong><br><small>可評估 ${assessment(s).coverage}%</small><br><span class="data-status ${sourceState(s)}">${sourceState(s)==='conflict'?'待確認衝突':sourceState(s)==='missing'?'資料不足':'可評估'}</span></td></tr>`).join('')||`<tr><td colspan="${workColumns.length+3}">沒有符合的園所。</td></tr>`}</tbody></table>${window.officialMode?`<div class="toolbar pad"><button onclick="Y.workNext(-1)" ${workPageIndex===0?'disabled':''}>上一頁</button><span>第 ${workPageIndex+1}／${Math.max(1,Math.ceil(all.length/25))} 頁 · 共 ${all.length} 筆</span><button onclick="Y.workNext(1)" ${(workPageIndex+1)*25>=all.length?'disabled':''}>下一頁</button></div>`:''}`;updateSelection();Y.decorateEvaluations?.();}
+  function workPage(){const years=[...new Set(['2025',...Object.values(model.data).flatMap(y=>Object.keys(y))])].sort().reverse();$('#page').innerHTML=`<div class="heading"><div><div class="eyebrow">資料整合 · 可追溯分析</div><h1>園所資料工作台</h1><p>不同來源歸戶到同一園所，先確認資料，再找出異常。</p></div><div class="work-heading"><button onclick="tab='import';go('settings')">＋ 匯入資料</button><button class="primary sheet-export" onclick="Y.exportExcel()">匯出所選 Excel</button></div></div><div class="p0-help">與風險總覽使用相同園所。基本資料與教育部評鑑為公開資料；財務、裁罰與輿情數值為合成示範。點數值可看來源與公式，缺資料不當成 0。</div><div class="metrics"><div class="metric"><span>整合園所</span><strong>${activeSchools().length}</strong><small>使用穩定園所識別碼</small></div><div class="metric"><span>待確認來源衝突</span><strong>${activeSchools().filter(s=>sourceState(s)==='conflict').length}</strong><small>保留所有來源，不直接覆寫</small></div><div class="metric"><span>有已知異常</span><strong>${activeSchools().filter(s=>assessment(s).anomalies>0).length}</strong><small>異常可查看計算與來源</small></div><div class="metric"><span>資料不足</span><strong>${activeSchools().filter(s=>assessment(s).coverage<60).length}</strong><small>與已知異常分開呈現</small></div></div><div class="panel"><div class="work-controls"><input class="search" aria-label="搜尋資料工作台" placeholder="園所名稱、地址或識別碼" value="${esc(workQuery)}" oninput="Y.workFilter('q',this.value)"><select aria-label="工作台行政區" onchange="Y.workFilter('district',this.value)">${options(['全部行政區',...districts],workDistrict,true)}</select><select aria-label="資料年度" onchange="Y.year(this.value)">${options(years,model.year)}</select><select aria-label="資料狀態" onchange="Y.workFilter('state',this.value)">${[['','全部資料狀態'],['conflict','来源衝突'],['missing','資料不足'],['ready','可評估']].map(([v,t])=>`<option value="${v}" ${v===workState?'selected':''}>${t}</option>`).join('')}</select></div><details><summary class="pad">選擇顯示與匯出欄位</summary><div class="column-picker">${availableFields().map(k=>`<label><input type="checkbox" ${workColumns.includes(k)?'checked':''} onchange="Y.column('${k}',this.checked)"> ${esc(label(k))}</label>`).join('')}</div></details><div class="panel-head"><span id="selection-count"></span><small>Excel 包含資料、來源明細、評分明細三張工作表</small></div><div id="work-results" class="table-wrap"></div></div>`;renderWorkRows();}
+  function renderWorkRows(){const rows=workRows();$('#work-results').innerHTML=`<table class="work-table"><thead><tr><th><input type="checkbox" aria-label="全選目前園所" ${rows.length&&rows.every(s=>workSelected.has(s.id))?'checked':''} onchange="Y.selectAll(this.checked)"></th><th>園所／年度</th>${workColumns.map(k=>`<th>${esc(label(k))}</th>`).join('')}<th>異常／完整度</th></tr></thead><tbody>${rows.map(s=>`<tr><td><input type="checkbox" aria-label="選取${esc(s.name)}" ${workSelected.has(s.id)?'checked':''} onchange="Y.select(${esc(JSON.stringify(s.id))},this.checked)"></td><td><button class="link" onclick="go('detail',${esc(JSON.stringify(s.id))})">${esc(s.name)}</button><br><small>${caseNumber(s.id)} · ${esc(s.district)} · ${esc(model.year)}</small></td>${workColumns.map(k=>{const c=current(s.id,k),r=records(s.id)[k];return `<td><button class="value-link" onclick="Y.source(${esc(JSON.stringify(s.id))},'${k}')">${esc(display(c?.value))}<small>${r?.conflict?'⚠ 來源衝突':c?'查看來源 ↗':'尚無資料'}</small></button></td>`;}).join('')}<td><span class="${assessment(s).anomalies?'high':'muted'}">${assessment(s).anomalies} 項異常</span><br><strong>${s.complete<60?'待補':assessment(s).score+' 分'}</strong><br><small>可評估 ${assessment(s).coverage}%</small><br><span class="data-status ${sourceState(s)}">${sourceState(s)==='conflict'?'待確認衝突':sourceState(s)==='missing'?'資料不足':'可評估'}</span></td></tr>`).join('')||`<tr><td colspan="${workColumns.length+3}">沒有符合的園所。</td></tr>`}</tbody></table>`;updateSelection();Y.decorateEvaluations?.();}
   const oldRender=render;
   render=()=>{if(page==='data')workPage();else oldRender();};
   const oldOverview=overview;
@@ -687,7 +683,7 @@
   Y.downloadExample=()=>downloadBlob(new Blob(['\ufeff'+csvEncode([sampleHeaders,sampleValues])],{type:'text/csv;charset=utf-8'}),'園所資料_固定格式範例.csv');
   Y.downloadText=()=>downloadBlob(new Blob([sampleHeaders.map((h,i)=>h+'：'+sampleValues[i]).join('\n')],{type:'text/plain;charset=utf-8'}),'固定格式文件範例.txt');
   uploadPanel=()=>`<div class="panel"><div class="panel-head"><div><h2>匯入並整合園所資料</h2><p>真實讀取本機檔案，人工確認後才更新；未串接 AI 或雲端。</p></div><button onclick="Y.demoImport()">載入合成範例</button></div><div class="pad"><div class="category-grid">${Object.entries(importCatalog).map(([k,v])=>`<label class="category-option"><input type="checkbox" ${importSession.categories.includes(k)?'checked':''} onchange="chooseImportCategory('${k}',this.checked)"><span><strong>${esc(v.label)}</strong><small>${esc(v.hint)}</small></span></label>`).join('')}</div><div class="upload-box" style="margin-top:18px"><label for="import-file"><b>選擇檔案（最多 10 MB／1,000 筆）</b></label><input id="import-file" type="file" accept=".csv,.xlsx,.json,.txt,.pdf,.docx" onchange="recognizeFile(this.files[0])" ${importSession.busy?'disabled':''}><small>CSV、Excel、JSON；文字 PDF／Word／TXT 支援一行一欄的固定格式。掃描 PDF 尚不支援。</small><label>CSV／TXT 編碼 <select onchange="importSession.encoding=this.value">${options(['utf-8','big5'],importSession.encoding)}</select></label><div class="toolbar"><button onclick="Y.downloadExample()">下載 CSV 範例</button><button onclick="Y.downloadText()">下載文件格式範例</button></div></div>${importSession.busy?'<div class="loading"><span class="spinner"></span><p>讀取並比對欄位…</p></div>':''}${importSession.message?`<div class="import-alert" role="alert" style="margin-top:15px">${esc(importSession.message)}</div>`:''}<div class="notice" style="margin-top:18px">目前只在瀏覽器本機處理，來源摘錄會保存於本機。請使用合規或合成資料；本機功能完成不代表允許將財務或個資上傳競賽 AWS。</div></div></div>`;
-  Y.demoImport=()=>{if(window.officialMode){toast('請於原有示範工作區載入範例；官方工作區請匯入實際檔案');return;}importSession.categories=Object.keys(importCatalog);importSession.file='合成範例.csv';importSession.sheets=[{name:'合成範例',rows:[sampleHeaders,sampleValues],locations:['第 1 列','第 2 列']}];loadImportSheet(0);importSession.step=2;renderImport();};
+  Y.demoImport=()=>{importSession.categories=Object.keys(importCatalog);importSession.file='合成範例.csv';importSession.sheets=[{name:'合成範例',rows:[sampleHeaders,sampleValues],locations:['第 1 列','第 2 列']}];loadImportSheet(0);importSession.step=2;renderImport();};
   recognizeFile=async file=>{
     if(!file)return Y.demoImport();const st=importSession;
     if(!st.categories.length){st.message='請先選擇資料類別。';renderImport();return;}
@@ -704,7 +700,7 @@
   mappingPanel=()=>oldMapping().replaceAll('AI 已整理好，請確認匯入欄位','已讀取檔案，請確認欄位對應').replaceAll('AI 已依你選擇的資料類別整理欄位（示範）。','本機依欄位名稱與別名比對，不是 AI 判斷。').replace('園所名稱為必填；新園所另需行政區與地址。既有園所以名稱與行政區核對。','園所名稱與資料年度必填；優先依園所識別碼歸戶。新園所另需行政區與地址。');
   const oldImportRender=renderImport;
   renderImport=()=>{oldImportRender();const panel=$('#import-panel');if(panel){for(const s of panel.querySelectorAll('.step'))s.innerHTML=s.innerHTML.replace('AI 辨識與勾選欄位','欄位對應與勾選');} };
-  function matching(v){if(v.schoolId){const official=schools.find(s=>s.officialId===v.schoolId);if(official)return official;const m=/^YA-(\d+)$/.exec(v.schoolId);return m?schoolById(Number(m[1])-1):schoolById(v.schoolId);}const hits=schools.filter(s=>s.name===v.name&&s.district===v.district);return hits.length===1?hits[0]:null;}
+  function matching(v){if(v.schoolId){const m=/^YA-(\d+)$/.exec(v.schoolId);return m?schoolById(Number(m[1])-1):schoolById(v.schoolId);}const hits=schools.filter(s=>s.name===v.name&&s.district===v.district);return hits.length===1?hits[0]:null;}
   validateImportRow=row=>{const v=row.values,errors=[];if(!v.name?.trim())errors.push('缺少園所名稱');if(!/^\d{4}$/.test(v.year||'')||Number(v.year)<1900||Number(v.year)>2100)errors.push('資料年度需為 1900–2100 西元四碼');if(!v.district?.trim())errors.push('缺少行政區');const target=matching(v);if(v.schoolId&&!target)errors.push('園所識別碼不存在，新增園所請清空識別碼');if(target&&v.name!==target.name)errors.push('識別碼與園所名稱不一致');if(target&&v.district!==target.district)errors.push('识別碼與行政區不一致');if(!target&&!v.address?.trim())errors.push('新增園所需有地址');for(const k of numericImportFields)if(v[k]!==undefined&&v[k]!==''&&(!/^\d+(\.\d+)?$/.test(v[k])||!Number.isFinite(Number(v[k]))))errors.push(label(k)+'需為非負數字');for(const k of ['capacity','studentCount','sourceStudentCount','previousStudentCount','penaltyCount','signalCount','signalBaseline'])if(v[k]&&Number(v[k])%1!==0)errors.push(label(k)+'需為整數');for(const k of ['penaltyDate','evaluationDate'])if(v[k]){const iso=v[k].replaceAll('/','-');const m=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(iso);if(!m||new Date(Date.UTC(+m[1],+m[2]-1,+m[3])).toISOString().slice(0,10)!==`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`)errors.push(label(k)+'日期無效');}if(importSession.preview.some(o=>o!==row&&o.include&&o.values.name===v.name&&o.values.district===v.district&&o.values.year===v.year))errors.push('同園所同年度重複列');return {errors,target};};
   const previousPreview=previewPanel;
   previewPanel=()=>previousPreview().replaceAll('示範資料將新增或更新在此 Demo 中；新園所顯示「資料不足」，不會直接判定為低風險。','確認後保存本機來源並重算。同年度不同數值會標示來源衝突，待人工選擇；不會直接覆蓋既有數值。');
@@ -752,42 +748,5 @@
   functionHelp.mapping.intro='依已知欄位別名建議對應，再由使用者確認；本機版未串接 AI。';
   functionHelp.preview.steps=['逐列修正與取消匯入。','依識別碼或名稱與行政區歸戶。','確認年度與必要欄位。','確認後保存來源並重新計算，衝突需另外確認。'];
   document.querySelector('.topline .demo').textContent='本機原型 · 內建資料為合成示範';
-  Y.installOfficial=(snapshot,saved)=>{
-    if(saved?.workspace==='ntpc-official-v1'){
-      const savedModel=saved.p0;
-      Object.assign(db,saved);
-      Object.assign(model,savedModel||{data:{},year:'最新快照',assessments:{},history:[]});
-    }else Object.assign(model,{data:{},year:'最新快照',assessments:{},history:[]});
-    db.p0=model;db.workspace='ntpc-official-v1';
-    model.year ||= '最新快照';
-    schools.splice(0,schools.length,...snapshot,...(db.importedSchools||[]));
-    districts.splice(0,districts.length,...[...new Set(schools.map(s=>s.district))].sort());
-    for(const school of snapshot){
-      const values={capacity:school.capacity,studentCount:school.studentCount,tuition:school.monthlyFee,
-        evaluationResult:school.evaluationResult};
-      for(const [key,value] of Object.entries(values)){
-        if(value==null||value==='')continue;
-        const field=key==='tuition'?'monthlyFee':key==='evaluationResult'?'evaluations':key;
-        const src=school.sources.find(x=>x.id===school.fieldMetadata[field]?.source)||school.sources.find(x=>x.id==='moe');
-        const latest=key==='evaluationResult'?school.latestEvaluation:null;
-        model.data[school.id] ||= {};model.data[school.id]['最新快照'] ||= {};
-        const fields=model.data[school.id]['最新快照'];
-        const r=fields[key] ||= {candidates:[],chosen:null,conflict:false};
-        const id='official-'+school.officialId+'-'+key;
-        r.candidates=r.candidates.filter(c=>c.id!==id);
-        r.candidates.push({id,value,source:src?.url||'官方快照',sourceKind:'official',
-          locator:latest?`${latest.year} 學年度 · ${latest.date||''}`:school.officialId,
-          excerpt:latest?latest.result:`${school.name}｜${label(key)}：${value}`,at:'2026-09-12'});
-        if(!r.chosen)r.chosen=id;
-        const chosen=r.candidates.find(c=>c.id===r.chosen);
-        if(!chosen)r.chosen=id;
-        else if(String(chosen.value)!==String(value))r.conflict=true;
-      }
-    }
-    db.sources=[{name:'新北市名錄／教育部評鑑',count:snapshot.length,updated:'2026-09-12',status:'正常',note:'官方快照；財務、裁罰及輿情未提供，保留缺值。'}];
-    window.officialReady=true;
-    workColumns=['capacity','studentCount','tuition','evaluationResult'];
-    recalc('載入官方快照');persist();render();
-  };
   page='overview';render();$$('nav button').forEach(b=>b.classList.toggle('active',b.id==='nav-overview'));/* 登入後先看風險總覽（今天該優先關注誰），資料工作台從側欄進入 */
 })();

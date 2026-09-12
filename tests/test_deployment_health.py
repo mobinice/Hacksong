@@ -8,12 +8,12 @@ class Response(io.BytesIO):
 
 class DeploymentHealthTests(unittest.TestCase):
     def test_validates_frontend_and_paginated_official_data(self):
-        responses=[Response(b'assets/official-workspace.js'),Response(b'{"status":"ok"}'),Response(b'{"total":1122,"data":[{}]}')]
+        responses=[Response(b'assets/youan-p0.js'),Response(b'{"status":"ok"}'),Response(b'{"total":1122,"data":[{}]}')]
         with patch('scripts.deployment_health.urllib.request.urlopen',side_effect=responses):
             check('http://localhost',attempts=1)
 
     def test_retries_service_startup(self):
-        responses=[OSError('starting'),Response(b'assets/official-workspace.js'),Response(b'{"status":"ok"}'),Response(b'{"total":1122,"data":[{}]}')]
+        responses=[OSError('starting'),Response(b'assets/youan-p0.js'),Response(b'{"status":"ok"}'),Response(b'{"total":1122,"data":[{}]}')]
         with patch('scripts.deployment_health.urllib.request.urlopen',side_effect=responses),patch('scripts.deployment_health.time.sleep') as sleep:
             check('http://localhost',attempts=2)
             sleep.assert_called_once_with(3)
@@ -23,6 +23,6 @@ class DeploymentHealthTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):check('http://localhost',attempts=1)
 
     def test_missing_snapshot_does_not_pass(self):
-        responses=[Response(b'assets/official-workspace.js'),Response(b'{"status":"ok"}'),Response(b'{"total":0,"data":[]}')]
+        responses=[Response(b'assets/youan-p0.js'),Response(b'{"status":"ok"}'),Response(b'{"total":0,"data":[]}')]
         with patch('scripts.deployment_health.urllib.request.urlopen',side_effect=responses):
             with self.assertRaises(RuntimeError):check('http://localhost',attempts=1)
