@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc">
+  <title id="title">教保機構風險預警平台 MVP 功能爆炸圖</title>
+  <desc id="desc">以平台核心為中心，向左右展開八個功能模組與其子功能。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F7FAFC"/>
+      <stop offset="1" stop-color="#EEF4F8"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#115E59"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#16324F" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .title{font:700 34px 'Microsoft JhengHei','Noto Sans TC',sans-serif;fill:#153047}
+      .subtitle{font:400 17px 'Microsoft JhengHei','Noto Sans TC',sans-serif;fill:#60758A}
+      .module-title{font:700 20px 'Microsoft JhengHei','Noto Sans TC',sans-serif;fill:#153047}
+      .item{font:400 15px 'Microsoft JhengHei','Noto Sans TC',sans-serif;fill:#40566B}
+      .core-title{font:700 25px 'Microsoft JhengHei','Noto Sans TC',sans-serif;fill:#FFFFFF}
+      .core-sub{font:400 16px 'Microsoft JhengHei','Noto Sans TC',sans-serif;fill:#D6F3EF}
+      .tag{font:700 13px 'Microsoft JhengHei','Noto Sans TC',sans-serif;fill:#FFFFFF}
+      .connector{fill:none;stroke:#9AAFC0;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+      .dot{fill:#0F766E}
+      .card{fill:#FFFFFF;stroke:#DCE6ED;stroke-width:1.5;rx:18;filter:url(#shadow)}
+      .accent-left{fill:#2563EB}
+      .accent-right{fill:#7C3AED}
+      .p0{fill:#DC2626}.p1{fill:#D97706}
+    </style>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <text x="960" y="58" text-anchor="middle" class="title">教保機構風險預警平台｜MVP 功能爆炸圖</text>
+  <text x="960" y="88" text-anchor="middle" class="subtitle">核心任務：找出高風險園所 → 解釋原因 → 支援查核行動</text>
+
+  <!-- Connectors: center to left -->
+  <path class="connector" d="M820 505 H770 Q745 505 745 480 V205 Q745 180 720 180 H610"/>
+  <path class="connector" d="M820 525 H745 Q720 525 720 500 V395 Q720 370 695 370 H610"/>
+  <path class="connector" d="M820 555 H745 Q720 555 720 580 V685 Q720 710 695 710 H610"/>
+  <path class="connector" d="M820 575 H770 Q745 575 745 600 V875 Q745 900 720 900 H610"/>
+
+  <!-- Connectors: center to right -->
+  <path class="connector" d="M1100 505 H1150 Q1175 505 1175 480 V205 Q1175 180 1200 180 H1310"/>
+  <path class="connector" d="M1100 525 H1175 Q1200 525 1200 500 V395 Q1200 370 1225 370 H1310"/>
+  <path class="connector" d="M1100 555 H1175 Q1200 555 1200 580 V685 Q1200 710 1225 710 H1310"/>
+  <path class="connector" d="M1100 575 H1150 Q1175 575 1175 600 V875 Q1175 900 1200 900 H1310"/>
+
+  <circle class="dot" cx="770" cy="505" r="6"/><circle class="dot" cx="745" cy="525" r="6"/>
+  <circle class="dot" cx="745" cy="555" r="6"/><circle class="dot" cx="770" cy="575" r="6"/>
+  <circle class="dot" cx="1150" cy="505" r="6"/><circle class="dot" cx="1175" cy="525" r="6"/>
+  <circle class="dot" cx="1175" cy="555" r="6"/><circle class="dot" cx="1150" cy="575" r="6"/>
+
+  <!-- Core -->
+  <rect x="820" y="450" width="280" height="180" rx="30" fill="url(#core)" filter="url(#shadow)"/>
+  <text x="960" y="510" text-anchor="middle" class="core-title">幼安雷達</text>
+  <text x="960" y="546" text-anchor="middle" class="core-title">MVP 平台核心</text>
+  <text x="960" y="582" text-anchor="middle" class="core-sub">風險排序・原因解釋・查核建議</text>
+
+  <!-- Left cards -->
+  <g transform="translate(80 105)">
+    <rect class="card" width="530" height="150"/>
+    <rect class="accent-left" width="8" height="150" rx="4"/>
+    <rect class="p0" x="454" y="18" width="52" height="26" rx="13"/><text x="480" y="36" text-anchor="middle" class="tag">P0</text>
+    <text x="30" y="42" class="module-title">1. 轄區風險總覽</text>
+    <text x="30" y="76" class="item">• 高／中／低風險園所數量　• 本週新增警示</text>
+    <text x="30" y="104" class="item">• 風險上升排行　　　　　• 行政區與類型分布</text>
+    <text x="30" y="132" class="item">• 高風險園所快速入口</text>
+  </g>
+
+  <g transform="translate(80 295)">
+    <rect class="card" width="530" height="150"/>
+    <rect class="accent-left" width="8" height="150" rx="4"/>
+    <rect class="p0" x="454" y="18" width="52" height="26" rx="13"/><text x="480" y="36" text-anchor="middle" class="tag">P0</text>
+    <text x="30" y="42" class="module-title">2. 園所風險清單</text>
+    <text x="30" y="76" class="item">• 依風險分數排序　　　　• 園所名稱搜尋</text>
+    <text x="30" y="104" class="item">• 行政區／類型篩選　　　• 風險原因篩選</text>
+    <text x="30" y="132" class="item">• 分數變化與案件狀態</text>
+  </g>
+
+  <g transform="translate(80 635)">
+    <rect class="card" width="530" height="150"/>
+    <rect class="accent-left" width="8" height="150" rx="4"/>
+    <rect class="p1" x="454" y="18" width="52" height="26" rx="13"/><text x="480" y="36" text-anchor="middle" class="tag">P1</text>
+    <text x="30" y="42" class="module-title">3. 資料整合與異常偵測</text>
+    <text x="30" y="76" class="item">• 基本／評鑑／裁罰資料　• 收費與財務資料</text>
+    <text x="30" y="104" class="item">• 新聞與公開輿情　　　　• 園所身分資料比對</text>
+    <text x="30" y="132" class="item">• 財務異常與資料矛盾規則</text>
+  </g>
+
+  <g transform="translate(80 825)">
+    <rect class="card" width="530" height="150"/>
+    <rect class="accent-left" width="8" height="150" rx="4"/>
+    <rect class="p0" x="454" y="18" width="52" height="26" rx="13"/><text x="480" y="36" text-anchor="middle" class="tag">P0</text>
+    <text x="30" y="42" class="module-title">4. 可解釋風險評分引擎</text>
+    <text x="30" y="76" class="item">• 法規／財務／評鑑　　　• 營運／輿情／資料完整性</text>
+    <text x="30" y="104" class="item">• 加權計算總分　　　　　• 風險等級判定</text>
+    <text x="30" y="132" class="item">• 分數來源、變化與計算依據</text>
+  </g>
+
+  <!-- Right cards -->
+  <g transform="translate(1310 105)">
+    <rect class="card" width="530" height="150"/>
+    <rect class="accent-right" x="522" width="8" height="150" rx="4"/>
+    <rect class="p0" x="24" y="18" width="52" height="26" rx="13"/><text x="50" y="36" text-anchor="middle" class="tag">P0</text>
+    <text x="100" y="42" class="module-title">5. 園所 360° 風險詳情</text>
+    <text x="30" y="76" class="item">• 園所基本資料　　　　　• 總分與各面向分數</text>
+    <text x="30" y="104" class="item">• 主要風險原因　　　　　• 資料來源與日期</text>
+    <text x="30" y="132" class="item">• 裁罰、評鑑、財務及輿情時間軸</text>
+  </g>
+
+  <g transform="translate(1310 295)">
+    <rect class="card" width="530" height="150"/>
+    <rect class="accent-right" x="522" width="8" height="150" rx="4"/>
+    <rect class="p1" x="24" y="18" width="52" height="26" rx="13"/><text x="50" y="36" text-anchor="middle" class="tag">P1</text>
+    <text x="100" y="42" class="module-title">6. AI 輿情事件分析</text>
+    <text x="30" y="76" class="item">• 辨識相關園所　　　　　• 事件主題分類</text>
+    <text x="30" y="104" class="item">• 嚴重度與可信度　　　　• 重複事件合併</text>
+    <text x="30" y="132" class="item">• 事件摘要、來源與未查證標示</text>
+  </g>
+
+  <g transform="translate(1310 635)">
+    <rect class="card" width="530" height="150"/>
+    <rect class="accent-right" x="522" width="8" height="150" rx="4"/>
+    <rect class="p0" x="24" y="18" width="52" height="26" rx="13"/><text x="50" y="36" text-anchor="middle" class="tag">P0</text>
+    <text x="100" y="42" class="module-title">7. AI 查核摘要與建議</text>
+    <text x="30" y="76" class="item">• 一頁式風險摘要　　　　• 前三項主要異常</text>
+    <text x="30" y="104" class="item">• 建議查核項目　　　　　• 建議調閱文件</text>
+    <text x="30" y="132" class="item">• 待人工確認事項與採用確認</text>
+  </g>
+
+  <g transform="translate(1310 825)">
+    <rect class="card" width="530" height="150"/>
+    <rect class="accent-right" x="522" width="8" height="150" rx="4"/>
+    <rect class="p1" x="24" y="18" width="52" height="26" rx="13"/><text x="50" y="36" text-anchor="middle" class="tag">P1</text>
+    <text x="100" y="42" class="module-title">8. 查核案件管理</text>
+    <text x="30" y="76" class="item">• 建立案件與優先程度　　• 指派承辦人</text>
+    <text x="30" y="104" class="item">• 待評估 → 查核中 → 完成</text>
+    <text x="30" y="132" class="item">• 回填確認／部分／未確認異常</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(790 1018)">
+    <rect class="p0" width="44" height="24" rx="12"/><text x="22" y="17" text-anchor="middle" class="tag">P0</text>
+    <text x="56" y="17" class="item">黑客松必做</text>
+    <rect class="p1" x="180" width="44" height="24" rx="12"/><text x="202" y="17" text-anchor="middle" class="tag">P1</text>
+    <text x="236" y="17" class="item">時間允許再做</text>
+  </g>
+</svg>

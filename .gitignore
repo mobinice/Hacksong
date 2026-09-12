@@ -1,0 +1,37 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+.aws/
+credentials
+credentials.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Dependencies, environments and caches
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.cache/
+.codex/
+.codex-build/
+.codex-finalizer/
+.playwright-cli/
+playwright-report/
+test-results/
+output/
+*.log
+
+# Editor / OS / Office temporary files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+*.tmp
+*.bak
