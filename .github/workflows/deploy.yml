@@ -17,17 +17,24 @@ jobs:
       - name: Setup SSH Deploy Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          cat << 'SSH_CONFIG' > ~/.ssh/config
+          Host *
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking accept-new
+          SSH_CONFIG
+          chmod 600 ~/.ssh/config
 
       - name: Verify SSH Connection
         run: |
-          ssh -i ~/.ssh/deploy_key -o BatchMode=yes ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful! Host uptime:' && uptime"
+          ssh -o BatchMode=yes ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful! Host uptime:' && uptime"
 
       - name: Deploy Code via Rsync
         run: |
           rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new" \
             --exclude='.git*' \
             --exclude='RESTORE*' \
             --exclude='*restore*' \
@@ -38,7 +45,7 @@ jobs:
 
       - name: Set Permissions and Reload Services
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'REMOTE_SCRIPT'
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'REMOTE_SCRIPT'
             sudo chown -R ubuntu:ubuntu ${{ secrets.EC2_TARGET_DIR }}
             sudo systemctl reload nginx
             echo "Nginx reloaded successfully."
