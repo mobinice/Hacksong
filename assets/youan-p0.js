@@ -485,7 +485,7 @@
         <div id="dimension-totals" class="legend">
           ${dims.map(d=>`<span>${d} <b>${round(db.rules.filter(r=>r.enabled&&r.dimension===d).reduce((n,r)=>n+Number(r.weight||0),0))}%</b></span>`).join('')}
         </div>
-        <p class="data-hint">各構面占比由規則權重動態加總。開關切換或修改門檻時，評分引擎即時動態重算各園所總分與 4 構面分布，並同步保存至 SQLite 資料庫。</p>
+        <p class="data-hint">各構面占比由規則權重動態加總。開關切換或修改門檻時，評分引擎即時動態重算各園所總分與 4 構面分布，並同步保存至雲端資料庫 (AWS RDS PostgreSQL)。</p>
       </div>
     </div>
     <div class="panel">
@@ -524,7 +524,7 @@
         <label class="field">占總分權重（%）<input name="weight" type="number" min="0" max="100" step="1" required value="${r.weight}"></label>
       </div>
       <label class="check" style="margin-top:14px"><input name="enabled" type="checkbox" ${r.enabled?'checked':''}> 啟用此規則</label>
-      <div class="notice" style="margin-top:14px">儲存後動態重新計算各園所分數與 4 構面分布，並同步保存至 SQLite。</div>
+      <div class="notice" style="margin-top:14px">儲存後動態重新計算各園所分數與 4 構面分布，並同步保存至雲端資料庫 (AWS RDS PostgreSQL)。</div>
       <div class="form-actions">
         <button type="button" onclick="closeModal()">取消</button>
         <button class="primary">儲存並即時重算</button>
@@ -563,7 +563,7 @@
     toast('已更新風險等級門檻，並動態重新分類所有園所！');
   };
   const previousSettings=settings;
-  settings=()=>{previousSettings();document.querySelectorAll('.tabs button').forEach(b=>{if(b.textContent==='資料欄位')b.textContent='欄位管理';});const note=$('#page>.note');if(note)note.textContent='資料已即時同步保存於瀏覽器與後端 SQLite 資料庫。規則與門檻變更即時動態重算；若需清空可點選「重設為初始示範資料」。';};
+  settings=()=>{previousSettings();document.querySelectorAll('.tabs button').forEach(b=>{if(b.textContent==='資料欄位')b.textContent='欄位管理';});const note=$('#page>.note');if(note)note.textContent='資料已即時同步保存於瀏覽器與後端雲端資料庫 (AWS RDS PostgreSQL)。規則與門檻變更即時動態重算；若需清空可點選「重設為初始示範資料」。';};
   const nav=document.createElement('button');nav.id='nav-data';nav.textContent='▤　園所資料工作台';nav.onclick=()=>go('data');$('nav').prepend(nav);
   function availableFields(){return [...new Set(['staffCostPerStudent',...allImportFields.map(f=>f[0]),...Object.values(model.data).flatMap(ys=>Object.values(ys).flatMap(r=>Object.keys(r)))])].filter(k=>!['name','district','address','type','schoolId','year'].includes(k));}
   function sourceState(s){const rr=Object.values(records(s.id));return rr.some(r=>r.conflict)?'conflict':assessment(s).coverage<100?'missing':'ready';}

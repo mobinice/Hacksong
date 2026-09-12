@@ -32,10 +32,10 @@ def load_dotenv(path=None):
 load_dotenv()
 
 from scripts.crawl_moe import create_session, fetch_district_schools, enrich_risk_metrics, generate_insights
-from scripts.storage_db import init_db, save_state, get_state, reset_db, get_stats
+from scripts.storage_db import init_db, save_state, get_state, reset_db, get_stats, migrate_sqlite_to_rds
 from scripts.risk_engine import evaluate_school_risk, recalculate_all_schools, DEFAULT_RULES, DEFAULT_THRESHOLDS
 
-# 初始化 SQLite 本地持久化資料庫
+# 初始化持久化資料庫 (優先連線 AWS RDS PostgreSQL，備援本地 SQLite)
 init_db()
 
 PORT = int(os.environ.get("PORT", 8088))
@@ -102,7 +102,7 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Insights not yet generated"}).encode("utf-8"))
             return
 
-        # 3. API: 取得 SQLite 持久化儲存狀態
+        # 3. API: 取得持久化儲存狀態 (支援 AWS RDS PostgreSQL / SQLite)
         elif path == "/api/storage/state":
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -112,11 +112,12 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 "status": "success",
                 "exists": state_info["exists"],
                 "data": state_info["data"],
+                "backend": state_info.get("backend"),
                 "updatedAt": state_info.get("updated_at")
             }, ensure_ascii=False).encode('utf-8'))
             return
 
-        # 4. API: 取得 SQLite 持久化資料庫統計
+        # 4. API: 取得持久化資料庫統計與後端連線資訊
         elif path == "/api/storage/stats":
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -341,7 +342,7 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
             return
 
-        # 5. API: 將狀態存入 SQLite 持久化資料庫
+        # 5. API: 將狀態存入持久化資料庫 (AWS RDS / SQLite)
         elif parsed.path == "/api/storage/save":
             content_length = int(self.headers.get('Content-Length', 0))
             post_body = self.rfile.read(content_length).decode('utf-8')
@@ -349,13 +350,15 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 payload = json.loads(post_body) if post_body else {}
                 db_data = payload.get("db", payload)
                 save_state(db_data)
+                stats = get_stats()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(json.dumps({
                     "status": "success",
-                    "message": "State successfully persisted to SQLite database"
-                }).encode('utf-8'))
+                    "backend": stats.get("backend"),
+                    "message": f"State successfully persisted to {stats.get('backend')}"
+                }, ensure_ascii=False).encode('utf-8'))
             except Exception as e:
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -363,17 +366,19 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
             return
 
-        # 6. API: 重設 SQLite 資料庫為初始示範狀態
+        # 6. API: 重設資料庫為初始示範狀態
         elif parsed.path == "/api/storage/reset":
             try:
                 reset_db()
+                stats = get_stats()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(json.dumps({
                     "status": "success",
-                    "message": "Database successfully reset to initial clean state"
-                }).encode('utf-8'))
+                    "backend": stats.get("backend"),
+                    "message": f"Database ({stats.get('backend')}) successfully reset to initial clean state"
+                }, ensure_ascii=False).encode('utf-8'))
             except Exception as e:
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -381,7 +386,27 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
             return
 
-        # 7. API: 接收自訂規則或門檻，動態重新計算所有園所風險並同步保存
+        # 7. API: 手動將 SQLite 資料遷移至 AWS RDS PostgreSQL
+        elif parsed.path == "/api/storage/migrate":
+            try:
+                ok = migrate_sqlite_to_rds()
+                stats = get_stats()
+                self.send_response(200 if ok else 500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "success" if ok else "error",
+                    "stats": stats,
+                    "message": "SQLite 資料已全數遷移至 AWS RDS PostgreSQL" if ok else "資料遷移失敗"
+                }, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+            return
+
+        # 8. API: 接收自訂規則或門檻，動態重新計算所有園所風險並同步保存
         elif parsed.path == "/api/risk/recalculate":
             content_length = int(self.headers.get('Content-Length', 0))
             post_body = self.rfile.read(content_length).decode('utf-8')
@@ -397,8 +422,9 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 if custom_thresholds:
                     db_data["thresholds"] = custom_thresholds
                 
-                # 持久化更新至 SQLite
+                # 持久化更新至資料庫 (AWS RDS / SQLite)
                 save_state(db_data)
+                stats = get_stats()
 
                 # 準備示範園所資料
                 names = ['幸福','晨光','小橡樹','向陽','禾苗','彩虹','童心','小星星','蒲公英','暖陽','森林','青田','小樹屋','果實','晴空','樂田','花鹿','小太陽','星河','月芽','藍天','小海豚']
@@ -422,13 +448,13 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                     "schools": result["schools"],
                     "rules": result["rulesUsed"],
                     "thresholds": result["thresholdsUsed"],
-                    "message": "園所風險分數與 4 構面已動態重新計算並儲存至 SQLite"
+                    "backend": stats.get("backend"),
+                    "message": f"園所風險分數與 4 構面已動態重新計算並儲存至 {stats.get('backend')}"
                 }, ensure_ascii=False).encode('utf-8'))
             except Exception as e:
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
-                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
             return
 
         self.send_response(404)
