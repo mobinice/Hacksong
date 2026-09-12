@@ -9,6 +9,7 @@ jobs:
   deploy:
     name: Deploy to EC2 (${{ github.ref_name }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -41,11 +42,15 @@ jobs:
             --exclude='*.pem' \
             --exclude='*.key' \
             --exclude='.env*' \
+            --exclude='data/*.db*' \
+            --exclude='data/uploads/' \
+            --exclude='.cache/' \
             ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.EC2_TARGET_DIR }}/
 
       - name: Set Permissions and Reload Services
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'REMOTE_SCRIPT'
+            set -euo pipefail
             sudo chown -R ubuntu:ubuntu ${{ secrets.EC2_TARGET_DIR }}
             sudo systemctl daemon-reload
             sudo systemctl restart youan-radar-api.service
@@ -53,21 +58,21 @@ jobs:
             echo "Nginx and youan-radar-api service restarted successfully."
           REMOTE_SCRIPT
 
-      - name: Health Check (Frontend & Backend API)
+      - name: Health Check through EC2 Nginx
         run: |
-          echo "1. Checking Frontend HTTP status at http://${{ secrets.EC2_HOST }}/ ..."
-          FE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/)
-          echo "Frontend status: $FE_STATUS"
-          if [ "$FE_STATUS" -ne 200 ] && [ "$FE_STATUS" -ne 304 ]; then
-            echo "Frontend health check failed with status $FE_STATUS"
-            exit 1
-          fi
+          # Use the established SSH route; EC2_HOST may be an SSH-only address.
+          # Validate actual HTML and JSON, not just a running systemd process.
+          ssh -o BatchMode=yes -o ConnectTimeout=15 ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            'python3 - --base-url http://127.0.0.1' < scripts/deployment_health.py
 
-          echo "2. Checking Backend API status at http://${{ secrets.EC2_HOST }}/api/schools ..."
-          API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/api/schools)
-          echo "API status: $API_STATUS"
-          if [ "$API_STATUS" -ne 200 ]; then
-            echo "Backend API health check failed with status $API_STATUS"
-            exit 1
+      - name: Check public HTTP reachability
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          # Public reachability is a separate signal from application readiness.
+          if curl --fail --silent --show-error --connect-timeout 10 --max-time 20 \
+            --retry 2 --retry-delay 3 --output /dev/null "http://${EC2_HOST}/preview.html"; then
+            echo "Public frontend reachable from GitHub runner."
+          else
+            echo "::warning::EC2 application checks passed via SSH, but the runner cannot reach public HTTP. Check the public hostname and ingress rules; no network policy was changed."
           fi
-          echo "All services verified healthy!"
