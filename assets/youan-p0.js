@@ -40,7 +40,7 @@
   const round = x => Math.round((x + Number.EPSILON)*100)/100;
   const clone = x => structuredClone(x);
   db.p0 ||= {data:{},year:'2025',assessments:{},history:[],revision:0};
-  const model = db.p0;
+  let model = db.p0;
   let workQuery='',workDistrict='',workState='',workPageIndex=0,workSelected=new Set(), workColumns=['capacity','studentCount','penaltyCount','evaluationResult','staffCostPerStudent','staffCost','revenue'];
   let draftRules=null;
   const records = (id,year=model.year) => model.data[id]?.[year] || {};
@@ -111,7 +111,7 @@
           const count = Number(v.penaltyCount || 0);
           const th = Number(r.threshold || 1);
           hit = count >= th;
-          const scorePerHit = Math.floor(r.weight / 2 || 10);
+          const scorePerHit = r.weight / 2;
           const contrib = hit ? Math.min(count * scorePerHit, r.weight) : 0;
           observed = `近 12 個月裁罰紀錄 ${count} 次`;
           thresholdStr = `門檻 ≥ ${th} 次`;
@@ -253,15 +253,36 @@
       s.riskClass = isIncomplete ? 'unknown' : (s.riskLevel==='高風險'?'high':s.riskLevel==='低風險'?'low':'mid');
     }
     if(remember){
-      model.history.unshift({at,reason,version:`1.${db.version}`,year:model.year,assessments:before});
+      model.history.unshift({at,reason,version:`1.${db.version}`,year:model.year,assessments:Object.fromEntries(Object.entries(before).map(([id,a])=>[id,{score:a.score,coverage:a.coverage,version:a.version}]))});
       model.history=model.history.slice(0,20);
     }
   }
   recalc('載入');
   persist();
+  Y.registerExternalSchools=rows=>{
+    for(const s of rows){
+      const existing=schools.find(x=>String(x.id)===String(s.id));
+      if(existing)Object.assign(existing,s);else schools.push(s);
+      if(!districts.includes(s.district))districts.push(s.district);
+      // Official identity/evaluations remain separate from explicitly labelled demo finance.
+      const n=Number(String(s.id).replace(/\D/g,''))||1, count=Math.max(1,Math.round(s.capacity*.8));
+      const evalResult=s.evaluations[0]?.result;
+      const official={capacity:s.capacity,...(evalResult?{evaluationResult:/部分|追蹤|待改善|不符合/.test(evalResult)?'待改善':'符合'}:{})};
+      const demo={studentCount:count,previousStudentCount:Math.max(1,Math.round(count/1.05)),penaltyCount:n%7===0?2:0,tuition:5000,staffCost:count*(n%3===0?146000:80000),previousStaffCost:Math.round(count*(n%3===0?146000:80000)/(n%3===0?1.4:1.03)),revenue:count*(n%4===0?92000:60000),signalCount:n%5===0?10:2,signalBaseline:2};
+      for(const [key,value] of Object.entries({...demo,...official})){
+        if(s.complete<60&&!['capacity','evaluationResult','penaltyCount'].includes(key))continue;
+        if(records(s.id,'2025')[key])continue;
+        const publicField=key in official;
+        addObservation(s.id,'2025',key,value,publicField?'教育部公開園所資料':'合成示範財務／事件資料（非本園實際數據）',publicField?'API 園所欄位':'Demo 情境資料',`${s.name}｜${label(key)}：${value}｜${publicField?'公開欄位；評鑑年度另列於評鑑紀錄':'合成示範，非官方或實際營運數據'}`);
+      }
+      s.demoRisk=true;
+    }
+    recalc('同步園所與示範試算資料');persist();
+  };
+  Y.hydrate=()=>{model=db.p0||={data:{},year:'2025',assessments:{},history:[],revision:0};seed();const external=schools.filter(s=>s.external);if(external.length)Y.registerExternalSchools(external);else recalc('從資料庫載入');};
   const assessment=s=>model.assessments[s.id];
   Y.recalculate=(reason='外部證據更新')=>{recalc(reason,true);persist();render();};
-  Y.assessment=id=>model.assessments[Number(id)];
+  Y.assessment=id=>model.assessments[id];
   level=s=>s.complete<60?'資料不足':(s.score>=db.thresholds[2]?'高風險':s.score>=db.thresholds[1]?'中高風險':s.score>=db.thresholds[0]?'中風險':'低風險');
   cls=s=>s.complete<60?'unknown':(level(s)==='高風險'?'high':level(s)==='低風險'?'low':'mid');
   const tags=r=>`<div class="risk-tags"><span>${esc(r.dimension)}</span><span class="weight">權重 ${r.weight}%</span></div>`;
@@ -302,7 +323,7 @@
   function sourcesHTML(id,key){
     if(key==='staffCostPerStudent'){const c=current(id,key);return `<div class="formula">年度人事費 ÷ 實際學生數 = ${c?esc(display(c.value))+' 元／生／年':'暫無法計算'}</div><p class="data-hint">採用同年度資料；來源衝突、缺漏或學生數為 0 時不計算。</p><h3>年度人事費</h3>${sourcesHTML(id,'staffCost')}<h3>實際學生數</h3>${sourcesHTML(id,'studentCount')}`;}
     const r=records(id)[key];if(!r)return '<p class="empty-inline">此年度尚無來源資料。</p>';
-    return `${r.conflict?'<div class="import-alert">同年度來源值不同，暫不參與計算。請檢查口徑，選擇採用的來源。</div>':''}${r.candidates.map(c=>`<div class="source-card ${c.id===r.chosen?'active':''}"><b>${esc(c.source)}</b><p>${esc(c.locator)} · 資料年度 ${esc(model.year)}</p><small>取得時間 ${esc(c.at)}</small><pre>${esc(c.excerpt)}</pre><p>${esc(label(key))}：<b>${esc(display(c.value))}</b></p>${r.conflict||c.id!==r.chosen?`<button onclick="Y.resolve(${id},'${key}','${c.id}')">確認採用此來源</button>`:'<span class="data-status">目前採用</span>'}</div>`).join('')}`;
+    return `${r.conflict?'<div class="import-alert">同年度來源值不同，暫不參與計算。請檢查口徑，選擇採用的來源。</div>':''}${r.candidates.map(c=>`<div class="source-card ${c.id===r.chosen?'active':''}"><b>${esc(c.source)}</b><p>${esc(c.locator)} · 資料年度 ${esc(model.year)}</p><small>取得時間 ${esc(c.at)}</small><pre>${esc(c.excerpt)}</pre><p>${esc(label(key))}：<b>${esc(display(c.value))}</b></p>${r.conflict||c.id!==r.chosen?`<button onclick="Y.resolve(${esc(JSON.stringify(id))},'${key}','${c.id}')">確認採用此來源</button>`:'<span class="data-status">目前採用</span>'}</div>`).join('')}`;
   }
   Y.source=(id,key)=>{openModal(`${schoolById(id).name} · ${label(key)}`,sourcesHTML(id,key));$('#modal').classList.add('modal-wide');};
   Y.resolve=(id,key,cid)=>{const backup=clone(model),r=records(id)[key];if(!r?.candidates.some(c=>c.id===cid))return;r.chosen=cid;r.conflict=false;recalc('人工確認來源',true);if(!persist()){Object.assign(model,backup);recalc('還原');return;}closeModal();render();toast('已採用來源並重新計算；其他來源仍保留');};
@@ -314,7 +335,7 @@
       <h2 style="margin-bottom:6px">${esc(r.name)}</h2>
       <div style="margin-bottom:18px">
         <span class="pill" style="background:#eef4fa;color:var(--blue);font-weight:600">${esc(r.dimension)}</span>
-        <span class="pill ${r.contribution > 0 ? 'high' : 'low'}" style="margin-left:6px">${r.contribution > 0 ? `觸發加權 +${r.contribution} 分` : '未觸發 (0 分)'}</span>
+        <span class="pill ${r.contribution > 0 ? 'high' : 'low'}" style="margin-left:6px">${r.contribution > 0 ? `觸發加權 ${r.contribution>=0?'+':''}${r.contribution} 分` : '未觸發 (0 分)'}</span>
       </div>
       <div class="compare" style="margin-bottom:18px">
         <div>
@@ -354,9 +375,9 @@
   detail=()=>{
     oldDetail();const s=schoolById(selected),a=assessment(s),host=$('.detail-grid>div');
     const header=$('.heading');header.querySelector('p').textContent=`${s.type} · ${s.district} · 核定 ${display(val(s.id,'capacity'))} 人`;
-    header.querySelector('p:last-child').textContent=s.address+(s.imported||s.officialId?'':'（合成示範地址）');
+    header.querySelector('p:last-child').textContent=s.address+(s.external?' · 基本資料為公開資料；財務與事件分數為示範試算':(s.imported||s.officialId)?'':'（合成示範地址）');
     const bAdv=db.bedrockAdvice?.[s.id];
-    const bedrockAdvicePanel = `<div class="panel"><div class="panel-head"><div><h2>AI 輔助查核建議</h2><p>${bAdv?'由 AWS Bedrock (Amazon Nova) 深度分析生成，可勾選現場查核項目。':'依上方風險整理的建議，可勾選已確認項目。'}</p></div><div style="display:flex;gap:8px;align-items:center">${bAdv?'<span class="pill" style="background:#edf6f1;color:#287a60;font-weight:600">⚡ AWS Bedrock</span>':'<span class="pill">待人工確認</span>'}<button class="link" style="font-size:12px;" onclick="generateBedrockAdvice(${s.id},true)">${bAdv?'🔄 重新生成':'✨ 啟用 Bedrock 深度分析'}</button></div></div><div class="pad">${bedrockLoading?`<div class="loading" style="padding:28px 20px"><div class="spinner"></div><p style="margin-top:12px;font-size:13px;color:var(--blue);font-weight:600">AWS Bedrock (Amazon Nova) 深度歸因分析中...</p><small>比對教保法規、違規歷史與同儕財務指標以產出專屬工作清單</small></div>`:bAdv?`<div class="notice" style="background:#f0f5fa;border-left:4px solid var(--blue);margin-bottom:18px"><strong>🎯 查核核心焦點：</strong>${esc(bAdv.summary)}<div style="margin-top:6px;font-size:12px"><span class="pill ${bAdv.priorityLevel?.includes('高')?'high':'mid'}">查核優先度：${esc(bAdv.priorityLevel||'高優先')}</span></div></div>${(bAdv.suggestedActions||[]).map((act,i)=>`<div style="margin-bottom:20px;border-bottom:1px dashed var(--line);padding-bottom:16px"><h3 style="display:flex;align-items:center;gap:8px;font-size:15px"><span class="number">${i+1}</span> ${esc(act.title)}</h3><p style="font-size:12px;color:var(--muted);margin:4px 0 10px">${esc(act.reason)}</p><strong style="font-size:12px;color:var(--blue);display:block;margin:8px 0 4px">🔍 現場查核清單 (Checklist)：</strong>${(act.checklist||[]).map((item,j)=>`<label class="check"><input type="checkbox" ${db.reviews[s.id]?.checks?.includes('b-'+i+'-'+j)?'checked':''} onchange="saveCheck('b-${i}-${j}',this.checked)"><span>${esc(item)}</span></label>`).join('')}${act.requiredDocuments&&act.requiredDocuments.length?`<div style="background:#fafcfe;border:1px solid #dce6f0;border-radius:6px;padding:10px 14px;margin-top:10px"><strong style="font-size:12px;color:#92541f">📋 建議現場調閱之公文與表冊清單：</strong><ul style="margin:6px 0 0 18px;padding:0;font-size:12px;color:var(--ink)">${act.requiredDocuments.map(doc=>`<li>${esc(doc)}</li>`).join('')}</ul></div>`:''}</div>`).join('')}<div class="notice" style="margin-top:14px;font-size:11px">${esc(bAdv.complianceNotice||'AI 分析內容僅供稽查排序及輔助判斷，不作為違法認定或行政裁處之直接依據。')}</div>`:`<div style="text-align:center;padding:16px 20px;background:#f4f7fb;border:1px dashed #8fb6dd;border-radius:8px;margin-bottom:18px"><p style="font-size:14px;font-weight:600;color:var(--blue);margin-bottom:6px">🤖 啟用 AWS Bedrock 智能查核專家分析</p><p style="font-size:12px;color:var(--muted);margin-bottom:14px">調用 Amazon Nova 大語言模型，針對此園所特定違規事由與異常指標進行深度歸因，自動產出專屬查核清單與調閱表冊。</p><button class="primary" onclick="generateBedrockAdvice(${s.id},true)">✨ 立即產生專屬查核建議與公文清單 (AWS Bedrock)</button></div>${a.rows.filter(r=>r.hit).map(r=>`<label class="check"><input type="checkbox" ${db.reviews[s.id]?.checks?.includes(r.ruleId)?'checked':''} onchange="saveCheck('${r.ruleId}',this.checked)">${esc(r.action)}</label>`).join('')||'<p>先補齊資料並確認來源。</p>'}`}`;
+    const bedrockAdvicePanel = `<div class="panel"><div class="panel-head"><div><h2>AI 輔助查核建議</h2><p>${bAdv?'由 AWS Bedrock (Amazon Nova) 深度分析生成，可勾選現場查核項目。':'依上方風險整理的建議，可勾選已確認項目。'}</p></div><div style="display:flex;gap:8px;align-items:center">${bAdv?'<span class="pill" style="background:#edf6f1;color:#287a60;font-weight:600">⚡ AWS Bedrock</span>':'<span class="pill">待人工確認</span>'}<button class="link" style="font-size:12px;" onclick="generateBedrockAdvice(${esc(JSON.stringify(s.id))},true)">${bAdv?'🔄 重新生成':'✨ 啟用 Bedrock 深度分析'}</button></div></div><div class="pad">${bedrockLoading?`<div class="loading" style="padding:28px 20px"><div class="spinner"></div><p style="margin-top:12px;font-size:13px;color:var(--blue);font-weight:600">AWS Bedrock (Amazon Nova) 深度歸因分析中...</p><small>比對教保法規、違規歷史與同儕財務指標以產出專屬工作清單</small></div>`:bAdv?`<div class="notice" style="background:#f0f5fa;border-left:4px solid var(--blue);margin-bottom:18px"><strong>🎯 查核核心焦點：</strong>${esc(bAdv.summary)}<div style="margin-top:6px;font-size:12px"><span class="pill ${bAdv.priorityLevel?.includes('高')?'high':'mid'}">查核優先度：${esc(bAdv.priorityLevel||'高優先')}</span></div></div>${(bAdv.suggestedActions||[]).map((act,i)=>`<div style="margin-bottom:20px;border-bottom:1px dashed var(--line);padding-bottom:16px"><h3 style="display:flex;align-items:center;gap:8px;font-size:15px"><span class="number">${i+1}</span> ${esc(act.title)}</h3><p style="font-size:12px;color:var(--muted);margin:4px 0 10px">${esc(act.reason)}</p><strong style="font-size:12px;color:var(--blue);display:block;margin:8px 0 4px">🔍 現場查核清單 (Checklist)：</strong>${(act.checklist||[]).map((item,j)=>`<label class="check"><input type="checkbox" ${db.reviews[s.id]?.checks?.includes('b-'+i+'-'+j)?'checked':''} onchange="saveCheck('b-${i}-${j}',this.checked)"><span>${esc(item)}</span></label>`).join('')}${act.requiredDocuments&&act.requiredDocuments.length?`<div style="background:#fafcfe;border:1px solid #dce6f0;border-radius:6px;padding:10px 14px;margin-top:10px"><strong style="font-size:12px;color:#92541f">📋 建議現場調閱之公文與表冊清單：</strong><ul style="margin:6px 0 0 18px;padding:0;font-size:12px;color:var(--ink)">${act.requiredDocuments.map(doc=>`<li>${esc(doc)}</li>`).join('')}</ul></div>`:''}</div>`).join('')}<div class="notice" style="margin-top:14px;font-size:11px">${esc(bAdv.complianceNotice||'AI 分析內容僅供稽查排序及輔助判斷，不作為違法認定或行政裁處之直接依據。')}</div>`:`<div style="text-align:center;padding:16px 20px;background:#f4f7fb;border:1px dashed #8fb6dd;border-radius:8px;margin-bottom:18px"><p style="font-size:14px;font-weight:600;color:var(--blue);margin-bottom:6px">🤖 啟用 AWS Bedrock 智能查核專家分析</p><p style="font-size:12px;color:var(--muted);margin-bottom:14px">調用 Amazon Nova 大語言模型，針對此園所特定違規事由與異常指標進行深度歸因，自動產出專屬查核清單與調閱表冊。</p><button class="primary" onclick="generateBedrockAdvice(${esc(JSON.stringify(s.id))},true)">✨ 立即產生專屬查核建議與公文清單 (AWS Bedrock)</button></div>${a.rows.filter(r=>r.hit).map(r=>`<label class="check"><input type="checkbox" ${db.reviews[s.id]?.checks?.includes(r.ruleId)?'checked':''} onchange="saveCheck('${r.ruleId}',this.checked)">${esc(r.action)}</label>`).join('')||'<p>先補齊資料並確認來源。</p>'}`}`;
 
     const scoreCard = `<div class="panel pad">
       <div class="summary">
@@ -375,7 +396,7 @@
       ${s.complete<60?`<div class="notice" style="margin-top:16px;background:#fff5e8;border-left:4px solid var(--orange);color:#874d00">⚠️ <strong>防呆機制生效中：</strong>此園所資料完整度未達 60%（目前僅 ${a.coverage}%），系統獨立標記為「⚠️ 資料不足」，嚴禁判定為低風險。請優先要求園所補齊公開財務報告與收費公告。</div>`:a.coverage<100?'<div class="notice" style="margin-top:16px">綜合評估尚不完整。缺漏或衝突資料不計為低風險，已發現的異常仍列出；未對剩餘權重重新放大。</div>':''}
       <div class="dimension-grid">
         ${dims.map(d=>{
-          const rr=a.rows.filter(r=>r.dimension===d),
+          const rr=a.rows.filter(r=>r.dimension===d&&r.enabled),
                 w=round(rr.reduce((n,r)=>n+r.weight,0)),
                 p=round(rr.reduce((n,r)=>n+(r.contribution||0),0));
           return `<div class="dimension-box">
@@ -399,10 +420,10 @@
       ${a.rows.filter(r=>r.hit).map((r,i)=>`<div class="reason risk-reason">
         <span class="number">${i+1}</span>
         <div>
-          <h3>${esc(r.name)} <span class="risk-points">+${r.contribution} 分</span></h3>
+          <h3>${esc(r.name)} <span class="risk-points">${r.contribution>=0?'+':''}${r.contribution} 分</span></h3>
           ${tags(r)}
           <p>${esc(r.formula)}</p>
-          <button class="link" onclick="Y.evidence(${s.id},'${r.ruleId}')">查看判斷依據與數值比對 ↗</button>
+          <button class="link" onclick="Y.evidence(${esc(JSON.stringify(s.id))},'${r.ruleId}')">查看判斷依據與數值比對 ↗</button>
         </div>
       </div>`).join('')||'<div class="empty-inline">目前已知資料未命中啟用規則；不代表資料已齊全或園所無風險。</div>'}
       ${a.rows.filter(r=>r.raw===null).map(r=>`<div class="reason">
@@ -410,7 +431,7 @@
           <h3>${esc(r.name)}</h3>
           ${tags(r)}
           <p>${esc(r.formula)}</p>
-          <button class="link" onclick="Y.evidence(${s.id},'${r.ruleId}')">查看缺漏／衝突來源</button>
+          <button class="link" onclick="Y.evidence(${esc(JSON.stringify(s.id))},'${r.ruleId}')">查看缺漏／衝突來源</button>
         </div>
       </div>`).join('')}
     </div>`;
@@ -432,35 +453,24 @@
               <td>${esc(r.name)}<br><small>${esc(r.dimension)}</small></td>
               <td>${r.weight}%</td>
               <td>${!r.enabled?'<span class="muted">已停用</span>':r.raw===null?'待確認':r.hit?'<span class="high">觸發條件</span>':'<span class="low">正常合規</span>'}</td>
-              <td>${!r.enabled?'0 分':r.raw===null?'暫不計入':`+${r.contribution} 分`}</td>
+              <td>${!r.enabled?'0 分':r.raw===null?'暫不計入':`${r.contribution>=0?'+':''}${r.contribution} 分`}</td>
             </tr>`).join('')}
           </tbody>
           <tfoot>
-            <tr><td>四構面加權總分</td><td>100%</td><td>資料完整度 ${a.coverage}%</td><td>${s.complete<60?'— (資料不足)':a.score+' 分'}</td></tr>
+            <tr><td>四構面加權總分</td><td>${activeTotal(db.rules)}%</td><td>資料完整度 ${a.coverage}%</td><td>${s.complete<60?'— (資料不足)':a.score+' 分'}</td></tr>
           </tfoot>
         </table>
       </div>
     </div>`;
 
     const shown=db.fields.filter(f=>f.show);
-    const fieldsPanel = shown.length ? `<div class="panel"><div class="panel-head"><div><h2>園所資料欄位</h2><p>依欄位管理設定顯示；點擊數值查看來源。</p></div></div><div class="table-wrap"><table><thead><tr><th>欄位</th><th>數值</th><th>單位</th></tr></thead><tbody>${shown.map(f=>`<tr><td>${esc(f.name)}</td><td><button class="link" onclick="Y.source(${s.id},'${f.key}')">${esc(display(current(s.id,f.key)?.value))}${records(s.id)[f.key]?.conflict?'（來源衝突）':''}</button></td><td>${esc(f.unit||'—')}</td></tr>`).join('')}</tbody></table></div></div>` : '';
+    const fieldsPanel = shown.length ? `<div class="panel"><div class="panel-head"><div><h2>園所資料欄位</h2><p>依欄位管理設定顯示；點擊數值查看來源。</p></div></div><div class="table-wrap"><table><thead><tr><th>欄位</th><th>數值</th><th>單位</th></tr></thead><tbody>${shown.map(f=>`<tr><td>${esc(f.name)}</td><td><button class="link" onclick="Y.source(${esc(JSON.stringify(s.id))},'${f.key}')">${esc(display(current(s.id,f.key)?.value))}${records(s.id)[f.key]?.conflict?'（來源衝突）':''}</button></td><td>${esc(f.unit||'—')}</td></tr>`).join('')}</tbody></table></div></div>` : '';
 
     host.innerHTML = scoreCard + reasonsPanel + breakdownPanel + bedrockAdvicePanel + fieldsPanel;
     addFunctionHelp();
   };
   function activeTotal(rules){return round(rules.filter(r=>r.enabled).reduce((n,r)=>n+Number(r.weight||0),0));}
-  async function syncRiskRecalculate(){
-    try {
-      const apiBase = window.API_BASE || (window.location.hostname.includes('s3') || window.location.hostname.includes('amazonaws.com') || window.location.protocol === 'file:' ? 'http://54.191.62.21' : '');
-      await fetch(apiBase + '/api/risk/recalculate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rules: db.rules, thresholds: db.thresholds })
-      });
-    } catch(e) {
-      console.warn('Risk recalculate sync warning:', e);
-    }
-  }
+  function syncRiskRecalculate(){ return persist(); }
   rulesPanel=()=>{
     return `<div class="panel">
       <div class="panel-head">
@@ -468,7 +478,7 @@
           <h2>風險判斷規則 <span class="pill">版本 1.${db.version}</span></h2>
           <p>設定各規則占總分的比例；開關切換或調整門檻即時動態重算所有園所。</p>
         </div>
-        <button onclick="historyModal()">查看修改紀錄</button>
+        <div class="toolbar"><button class="primary" onclick="Y.editWeights()">調整權重</button><button onclick="historyModal()">查看修改紀錄</button></div>
       </div>
       <div class="rule-total">
         <strong id="weight-total" class="weight-sum">${activeTotal(db.rules)}%</strong>
@@ -486,7 +496,7 @@
                 <p class="condition-note">${esc(spec.find(p=>p[0]===r.id)?.[6]||r.condition)}${r.id==='repeat'?'；每次累加':`；門檻 ${display(r.threshold)}`}</p>
               </td>
               <td>${esc(r.dimension)}</td>
-              <td><div class="rule-controls"><b>${r.weight}%</b></div></td>
+              <td><div class="rule-controls"><b>${r.weight}%</b><button class="link" onclick="Y.editWeights(${i})">調整</button></div></td>
               <td>
                 <button class="switch ${r.enabled?'':'off'}" aria-pressed="${r.enabled}" onclick="toggleRule(${i})">${r.enabled?'已啟用':'已停用'}</button>
               </td>
@@ -518,6 +528,20 @@
       </div>
     </div>`;
   };
+  Y.editWeights=focus=>{
+    openModal('調整風險規則權重',`<form onsubmit="Y.saveWeights(event)"><p>調整各事件占總分的比例；全部規則合計需為 100%。停用規則不計分。</p><div class="form-grid" style="margin-top:18px">${db.rules.map((r,i)=>`<label class="field">${esc(r.name)}${r.enabled?'':'（已停用）'}<input aria-label="${esc(r.name)}權重" name="weight${i}" type="number" min="0" max="100" step="1" required value="${r.weight}" oninput="Y.weightTotal(this.form)"></label>`).join('')}</div><div class="notice" style="margin-top:18px">合計：<b id="weight-draft-total">${db.rules.reduce((n,r)=>n+Number(r.weight),0)}%</b> ／ 100%</div><p id="weights-error" class="form-error" role="alert"></p><div class="form-actions"><button type="button" onclick="closeModal()">取消</button><button class="primary">儲存並重算所有園所</button></div></form>`);
+    if(Number.isInteger(focus))document.querySelector(`[name="weight${focus}"]`)?.focus();
+  };
+  Y.weightTotal=form=>{document.getElementById('weight-draft-total').textContent=db.rules.reduce((n,r,i)=>n+Number(form.elements['weight'+i].value||0),0)+'%';};
+  Y.saveWeights=event=>{
+    event.preventDefault();const form=event.target,weights=db.rules.map((r,i)=>Number(form.elements['weight'+i].value));
+    if(weights.some(w=>!Number.isFinite(w)||w<0||w>100)||round(weights.reduce((a,b)=>a+b,0))!==100){document.getElementById('weights-error').textContent='權重合計必須為 100%，請調整後再儲存。';return;}
+    const previous=clone(db.rules);db.rules.forEach((r,i)=>r.weight=weights[i]);db.version++;
+    db.history.unshift({version:db.version,by:db.profile?.name||'承辦人',at:stamp(),date:isoToday(),text:db.rules.map((r,i)=>`${r.name}：${previous[i].weight}% → ${r.weight}%`).join('；')});
+    recalc('調整規則權重',true);
+    if(!persist()){db.rules=previous;db.version--;db.history.shift();recalc('還原');document.getElementById('weights-error').textContent='儲存失敗，已還原權重。';return;}
+    closeModal();render();toast('已調整權重，總覽、詳情與資料工作台分數已同步重算');
+  };
   toggleRule=i=>{
     db.rules[i].enabled=!db.rules[i].enabled;
     const r=db.rules[i];
@@ -535,7 +559,7 @@
         <label class="field full">風險構面<select name="dimension">${options(dims,r.dimension)}</select></label>
         <div class="field full"><span>計算方式</span><div class="formula">${esc(p?.[6]||r.condition)}</div></div>
         <label class="field">${r.id==='repeat'?'裁罰門檻次數':'比較門檻'}<input name="threshold" type="number" min="0" step="any" required value="${r.threshold}"></label>
-        <label class="field">占總分權重（%）<input name="weight" type="number" min="0" max="100" step="1" required value="${r.weight}"></label>
+        <label class="field">占總分權重（%）<input name="weight" type="number" readonly value="${r.weight}"><small>請使用規則列表的「調整權重」，一次調整合計 100%。</small></label>
       </div>
       <label class="check" style="margin-top:14px"><input name="enabled" type="checkbox" ${r.enabled?'checked':''}> 啟用此規則</label>
       <div class="notice" style="margin-top:14px">儲存後會動態重新計算各園所分數與 4 構面分布，並同步保存；重新整理後仍會保留。</div>
@@ -581,23 +605,23 @@
   const nav=document.createElement('button');nav.id='nav-data';nav.textContent='▤　園所資料工作台';nav.onclick=()=>go('data');$('nav').prepend(nav);
   function availableFields(){return [...new Set(['staffCostPerStudent',...allImportFields.map(f=>f[0]),...Object.values(model.data).flatMap(ys=>Object.values(ys).flatMap(r=>Object.keys(r)))])].filter(k=>!['name','district','address','type','schoolId','year'].includes(k));}
   function sourceState(s){const rr=Object.values(records(s.id));return rr.some(r=>r.conflict)?'conflict':assessment(s).coverage<60?'missing':'ready';}
-  function workRows(){return schools.filter(s=>(!workQuery||workspaceMatches(s,workQuery)||(s.name+s.address+`${esc(s.officialId||('YA-'+String(s.id+1).padStart(4,'0')))}`).includes(workQuery))&&(!workDistrict||s.district===workDistrict)&&(!workState||sourceState(s)===workState));}
+  function workRows(){return activeSchools().filter(s=>(!workQuery||workspaceMatches(s,workQuery)||(s.name+s.address+`${esc(s.officialId||('YA-'+String(s.id+1).padStart(4,'0')))}`).includes(workQuery))&&(!workDistrict||s.district===workDistrict)&&(!workState||sourceState(s)===workState));}
   Y.refreshWork=()=>{if(page==='data')renderWorkRows();};
   Y.year=y=>{model.year=y;workSelected.clear();recalc('切換年度');persist();render();};
   Y.workFilter=(key,v)=>{workPageIndex=0;if(key==='q')workQuery=v;if(key==='district')workDistrict=v;if(key==='state')workState=v;renderWorkRows();};
   Y.column=(k,on)=>{workColumns=on?[...new Set([...workColumns,k])]:workColumns.filter(x=>x!==k);renderWorkRows();};
   Y.select=(id,on)=>{on?workSelected.add(id):workSelected.delete(id);updateSelection();};
   Y.selectAll=on=>{for(const s of workRows())on?workSelected.add(s.id):workSelected.delete(s.id);renderWorkRows();};
-  function updateSelection(){if($('#selection-count'))$('#selection-count').textContent='';}
-  function workPage(){const years=[...new Set([window.officialMode?'最新快照':'2025',...Object.values(model.data).flatMap(y=>Object.keys(y))])].sort().reverse();$('#page').innerHTML=`<div class="heading"><div><div class="eyebrow">資料整合 · 可追溯分析</div><h1>園所資料工作台</h1><p>不同來源歸戶到同一園所，先確認資料，再找出異常。</p></div><div class="work-heading"><button onclick="tab='import';go('settings')">＋ 匯入資料</button><button class="primary sheet-export" onclick="Y.exportExcel()">匯出所選 Excel</button></div></div><div class="p0-help">每個數值都可查看來源與原文。來源衝突需人工確認，缺資料不當成 0；${window.officialMode?'官方資料快照；評鑑使用最近公開結果，原始日期與學年度保留於來源。':'目前為本機原型，示範數據皆為合成。'}</div><div class="metrics"><div class="metric"><span>整合園所</span><strong>${schools.length}</strong><small>使用穩定園所識別碼</small></div><div class="metric"><span>待確認來源衝突</span><strong>${schools.filter(s=>sourceState(s)==='conflict').length}</strong><small>保留所有來源，不直接覆寫</small></div><div class="metric"><span>有已知異常</span><strong>${schools.filter(s=>assessment(s).anomalies>0).length}</strong><small>異常可查看計算與來源</small></div><div class="metric"><span>資料不足</span><strong>${schools.filter(s=>assessment(s).coverage<60).length}</strong><small>與已知異常分開呈現</small></div></div><div class="panel"><div class="work-controls"><input class="search" aria-label="搜尋資料工作台" placeholder="園所名稱、地址或識別碼" value="${esc(workQuery)}" oninput="Y.workFilter('q',this.value)"><select aria-label="工作台行政區" onchange="Y.workFilter('district',this.value)">${options(['全部行政區',...districts],workDistrict,true)}</select><select aria-label="資料年度" onchange="Y.year(this.value)">${options(years,model.year)}</select><select aria-label="資料狀態" onchange="Y.workFilter('state',this.value)">${[['','全部資料狀態'],['conflict','来源衝突'],['missing','資料不足'],['ready','可評估']].map(([v,t])=>`<option value="${v}" ${v===workState?'selected':''}>${t}</option>`).join('')}</select></div><details><summary class="pad">選擇顯示與匯出欄位</summary><div class="column-picker">${availableFields().map(k=>`<label><input type="checkbox" ${workColumns.includes(k)?'checked':''} onchange="Y.column('${k}',this.checked)"> ${esc(label(k))}</label>`).join('')}</div></details><div class="panel-head"><span id="selection-count"></span><small>Excel 包含資料、來源明細、評分明細三張工作表</small></div><div id="work-results" class="table-wrap"></div></div>`;renderWorkRows();}
+  function updateSelection(){if($('#selection-count'))$('#selection-count').textContent=`已選取 ${workSelected.size} 間園所`;}
+  function workPage(){const years=[...new Set([window.officialMode?'最新快照':'2025',...Object.values(model.data).flatMap(y=>Object.keys(y))])].sort().reverse();$('#page').innerHTML=`<div class="heading"><div><div class="eyebrow">資料整合 · 可追溯分析</div><h1>園所資料工作台</h1><p>不同來源歸戶到同一園所，先確認資料，再找出異常。</p></div><div class="work-heading"><button onclick="tab='import';go('settings')">＋ 匯入資料</button><button class="primary sheet-export" onclick="Y.exportExcel()">匯出所選 Excel</button></div></div><div class="p0-help">每個數值都可查看來源與原文。來源衝突需人工確認，缺資料不當成 0；${window.officialMode?'官方資料快照；評鑑使用最近公開結果，原始日期與學年度保留於來源。':'目前為本機原型，示範數據皆為合成。'}</div><div class="metrics"><div class="metric"><span>整合園所</span><strong>${activeSchools().length}</strong><small>使用穩定園所識別碼</small></div><div class="metric"><span>待確認來源衝突</span><strong>${activeSchools().filter(s=>sourceState(s)==='conflict').length}</strong><small>保留所有來源，不直接覆寫</small></div><div class="metric"><span>有已知異常</span><strong>${activeSchools().filter(s=>assessment(s).anomalies>0).length}</strong><small>異常可查看計算與來源</small></div><div class="metric"><span>資料不足</span><strong>${activeSchools().filter(s=>assessment(s).coverage<60).length}</strong><small>與已知異常分開呈現</small></div></div><div class="panel"><div class="work-controls"><input class="search" aria-label="搜尋資料工作台" placeholder="園所名稱、地址或識別碼" value="${esc(workQuery)}" oninput="Y.workFilter('q',this.value)"><select aria-label="工作台行政區" onchange="Y.workFilter('district',this.value)">${options(['全部行政區',...districts],workDistrict,true)}</select><select aria-label="資料年度" onchange="Y.year(this.value)">${options(years,model.year)}</select><select aria-label="資料狀態" onchange="Y.workFilter('state',this.value)">${[['','全部資料狀態'],['conflict','来源衝突'],['missing','資料不足'],['ready','可評估']].map(([v,t])=>`<option value="${v}" ${v===workState?'selected':''}>${t}</option>`).join('')}</select></div><details><summary class="pad">選擇顯示與匯出欄位</summary><div class="column-picker">${availableFields().map(k=>`<label><input type="checkbox" ${workColumns.includes(k)?'checked':''} onchange="Y.column('${k}',this.checked)"> ${esc(label(k))}</label>`).join('')}</div></details><div class="panel-head"><span id="selection-count"></span><small>Excel 包含資料、來源明細、評分明細三張工作表</small></div><div id="work-results" class="table-wrap"></div></div>`;renderWorkRows();}
   Y.workNext=delta=>{workPageIndex+=delta;renderWorkRows();};
-  function renderWorkRows(){const all=workRows();workPageIndex=Math.max(0,Math.min(workPageIndex,Math.ceil(all.length/25)-1));const rows=window.officialMode?all.slice(workPageIndex*25,(workPageIndex+1)*25):all;$('#work-results').innerHTML=`<table class="work-table"><thead><tr><th><input type="checkbox" aria-label="全選目前園所" ${rows.length&&rows.every(s=>workSelected.has(s.id))?'checked':''} onchange="Y.selectAll(this.checked)"></th><th>園所／年度</th>${workColumns.map(k=>`<th>${esc(label(k))}</th>`).join('')}<th>異常／完整度</th></tr></thead><tbody>${rows.map(s=>`<tr><td><input type="checkbox" aria-label="選取${esc(s.name)}" ${workSelected.has(s.id)?'checked':''} onchange="Y.select(${s.id},this.checked)"></td><td><button class="link" onclick="go('detail',${s.id})">${esc(s.name)}</button><br><small>${esc(s.officialId||('YA-'+String(s.id+1).padStart(4,'0')))} · ${esc(s.district)} · ${esc(model.year)}</small></td>${workColumns.map(k=>{const c=current(s.id,k),r=records(s.id)[k];return `<td><button class="value-link" onclick="Y.source(${s.id},'${k}')">${esc(display(c?.value))}<small>${r?.conflict?'⚠ 來源衝突':c?'查看來源 ↗':'尚無資料'}</small></button></td>`;}).join('')}<td><span class="${assessment(s).anomalies?'high':'muted'}">${assessment(s).anomalies} 項異常</span><br><small>可評估 ${assessment(s).coverage}%</small><br><span class="data-status ${sourceState(s)}">${sourceState(s)==='conflict'?'待確認衝突':sourceState(s)==='missing'?'資料不足':'可評估'}</span></td></tr>`).join('')||`<tr><td colspan="${workColumns.length+3}">沒有符合的園所。</td></tr>`}</tbody></table>${window.officialMode?`<div class="toolbar pad"><button onclick="Y.workNext(-1)" ${workPageIndex===0?'disabled':''}>上一頁</button><span>第 ${workPageIndex+1}／${Math.max(1,Math.ceil(all.length/25))} 頁 · 共 ${all.length} 筆</span><button onclick="Y.workNext(1)" ${(workPageIndex+1)*25>=all.length?'disabled':''}>下一頁</button></div>`:''}`;updateSelection();Y.decorateEvaluations?.();}
+  function renderWorkRows(){const all=workRows();workPageIndex=Math.max(0,Math.min(workPageIndex,Math.ceil(all.length/25)-1));const rows=window.officialMode?all.slice(workPageIndex*25,(workPageIndex+1)*25):all;$('#work-results').innerHTML=`<table class="work-table"><thead><tr><th><input type="checkbox" aria-label="全選目前園所" ${rows.length&&rows.every(s=>workSelected.has(s.id))?'checked':''} onchange="Y.selectAll(this.checked)"></th><th>園所／年度</th>${workColumns.map(k=>`<th>${esc(label(k))}</th>`).join('')}<th>異常／完整度</th></tr></thead><tbody>${rows.map(s=>`<tr><td><input type="checkbox" aria-label="選取${esc(s.name)}" ${workSelected.has(s.id)?'checked':''} onchange="Y.select(${esc(JSON.stringify(s.id))},this.checked)"></td><td><button class="link" onclick="go('detail',${esc(JSON.stringify(s.id))})">${esc(s.name)}</button><br><small>${esc(s.officialId||('YA-'+String(s.id+1).padStart(4,'0')))} · ${esc(s.district)} · ${esc(model.year)}</small></td>${workColumns.map(k=>{const c=current(s.id,k),r=records(s.id)[k];return `<td><button class="value-link" onclick="Y.source(${esc(JSON.stringify(s.id))},'${k}')">${esc(display(c?.value))}<small>${r?.conflict?'⚠ 來源衝突':c?'查看來源 ↗':'尚無資料'}</small></button></td>`;}).join('')}<td><span class="${assessment(s).anomalies?'high':'muted'}">${assessment(s).anomalies} 項異常</span><br><strong>${s.complete<60?'待補':assessment(s).score+' 分'}</strong><br><small>可評估 ${assessment(s).coverage}%</small><br><span class="data-status ${sourceState(s)}">${sourceState(s)==='conflict'?'待確認衝突':sourceState(s)==='missing'?'資料不足':'可評估'}</span></td></tr>`).join('')||`<tr><td colspan="${workColumns.length+3}">沒有符合的園所。</td></tr>`}</tbody></table>${window.officialMode?`<div class="toolbar pad"><button onclick="Y.workNext(-1)" ${workPageIndex===0?'disabled':''}>上一頁</button><span>第 ${workPageIndex+1}／${Math.max(1,Math.ceil(all.length/25))} 頁 · 共 ${all.length} 筆</span><button onclick="Y.workNext(1)" ${(workPageIndex+1)*25>=all.length?'disabled':''}>下一頁</button></div>`:''}`;updateSelection();Y.decorateEvaluations?.();}
   const oldRender=render;
   render=()=>{if(page==='data')workPage();else oldRender();};
   const oldOverview=overview;
-  overview=()=>{oldOverview();$('#page > .heading')?.remove();const cards=$$('.metrics .metric');if(cards[1]){cards[1].innerHTML=`<span>有已知異常</span><strong>${schools.filter(s=>assessment(s).anomalies>0).length}<small> 間</small></strong><small>包含評估資料尚不完整的園所</small>`;cards[1].onclick=()=>{metric=metric==='rising'?'':'rising';overview();};}if(cards[3])cards[3].querySelector('strong').innerHTML=`${schools.filter(s=>assessment(s).coverage<60).length}<span> 間</span>`;};
+  overview=()=>{oldOverview();$('#page > .heading')?.remove();const cards=$$('.metrics .metric');if(cards[1]){cards[1].innerHTML=`<span>有已知異常</span><strong>${activeSchools().filter(s=>assessment(s).anomalies>0).length}<small> 間</small></strong><small>包含評估資料尚不完整的園所</small>`;cards[1].onclick=()=>{metric=metric==='rising'?'':'rising';overview();};}if(cards[3])cards[3].querySelector('strong').innerHTML=`${activeSchools().filter(s=>assessment(s).coverage<60).length}<span> 間</span>`;};
   const $$=s=>Array.from(document.querySelectorAll(s));
-  listData=()=>schools.filter(s=>(!filters.q||(s.name+s.address).includes(filters.q))&&(!filters.district||s.district===filters.district)&&(!filters.risk||level(s)===filters.risk)&&(!metric||(metric==='high'?level(s)==='高風險':metric==='rising'?assessment(s).anomalies>0:metric==='pending'?status(s)==='待查核':assessment(s).coverage<60))).sort((a,b)=>filters.sort==='complete'?a.complete-b.complete:b.score-a.score);
+  listData=()=>activeSchools().filter(s=>(!filters.q||(s.name+s.address).includes(filters.q))&&(!filters.district||s.district===filters.district)&&(!filters.risk||level(s)===filters.risk)&&(!metric||(metric==='high'?level(s)==='高風險':metric==='rising'?assessment(s).anomalies>0:metric==='pending'?status(s)==='待查核':assessment(s).coverage<60))).sort((a,b)=>filters.sort==='complete'?a.complete-b.complete:b.score-a.score);
   const oldResults=updateResults;
   updateResults=()=>{
     oldResults();
@@ -680,7 +704,7 @@
   mappingPanel=()=>oldMapping().replaceAll('AI 已整理好，請確認匯入欄位','已讀取檔案，請確認欄位對應').replaceAll('AI 已依你選擇的資料類別整理欄位（示範）。','本機依欄位名稱與別名比對，不是 AI 判斷。').replace('園所名稱為必填；新園所另需行政區與地址。既有園所以名稱與行政區核對。','園所名稱與資料年度必填；優先依園所識別碼歸戶。新園所另需行政區與地址。');
   const oldImportRender=renderImport;
   renderImport=()=>{oldImportRender();const panel=$('#import-panel');if(panel){for(const s of panel.querySelectorAll('.step'))s.innerHTML=s.innerHTML.replace('AI 辨識與勾選欄位','欄位對應與勾選');} };
-  function matching(v){if(v.schoolId){const official=schools.find(s=>s.officialId===v.schoolId);if(official)return official;const m=/^YA-(\d+)$/.exec(v.schoolId);return m?schoolById(Number(m[1])-1):null;}const hits=schools.filter(s=>s.name===v.name&&s.district===v.district);return hits.length===1?hits[0]:null;}
+  function matching(v){if(v.schoolId){const official=schools.find(s=>s.officialId===v.schoolId);if(official)return official;const m=/^YA-(\d+)$/.exec(v.schoolId);return m?schoolById(Number(m[1])-1):schoolById(v.schoolId);}const hits=schools.filter(s=>s.name===v.name&&s.district===v.district);return hits.length===1?hits[0]:null;}
   validateImportRow=row=>{const v=row.values,errors=[];if(!v.name?.trim())errors.push('缺少園所名稱');if(!/^\d{4}$/.test(v.year||'')||Number(v.year)<1900||Number(v.year)>2100)errors.push('資料年度需為 1900–2100 西元四碼');if(!v.district?.trim())errors.push('缺少行政區');const target=matching(v);if(v.schoolId&&!target)errors.push('園所識別碼不存在，新增園所請清空識別碼');if(target&&v.name!==target.name)errors.push('識別碼與園所名稱不一致');if(target&&v.district!==target.district)errors.push('识別碼與行政區不一致');if(!target&&!v.address?.trim())errors.push('新增園所需有地址');for(const k of numericImportFields)if(v[k]!==undefined&&v[k]!==''&&(!/^\d+(\.\d+)?$/.test(v[k])||!Number.isFinite(Number(v[k]))))errors.push(label(k)+'需為非負數字');for(const k of ['capacity','studentCount','sourceStudentCount','previousStudentCount','penaltyCount','signalCount','signalBaseline'])if(v[k]&&Number(v[k])%1!==0)errors.push(label(k)+'需為整數');for(const k of ['penaltyDate','evaluationDate'])if(v[k]){const iso=v[k].replaceAll('/','-');const m=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(iso);if(!m||new Date(Date.UTC(+m[1],+m[2]-1,+m[3])).toISOString().slice(0,10)!==`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`)errors.push(label(k)+'日期無效');}if(importSession.preview.some(o=>o!==row&&o.include&&o.values.name===v.name&&o.values.district===v.district&&o.values.year===v.year))errors.push('同園所同年度重複列');return {errors,target};};
   const previousPreview=previewPanel;
   previewPanel=()=>previousPreview().replaceAll('示範資料將新增或更新在此 Demo 中；新園所顯示「資料不足」，不會直接判定為低風險。','確認後保存本機來源並重算。同年度不同數值會標示來源衝突，待人工選擇；不會直接覆蓋既有數值。');
@@ -690,7 +714,7 @@
     const backup=clone(db),schoolBackup=clone(schools),districtBackup=[...districts];let added=0,updated=0,conflicts=0;const logRows=[];
     const fingerprint=JSON.stringify({file:st.file,sheet:st.sheetIndex,rows:rows.map(r=>r.values)});
     if(db.imports.some(h=>h.fingerprint===fingerprint)){$('#import-error').textContent='這份檔案的相同資料已匯入，已避免重複寫入。';return;}
-    for(const row of rows){const v=row.values;let s=matching(v);const existed=!!s;if(!s){const id=Math.max(-1,...schools.map(s=>s.id))+1;s={id,name:v.name,district:v.district,address:v.address,type:v.type||'尚未提供',capacity:Number(v.capacity)||0,score:0,complete:0,trend:0,x:12+id%5*18,y:13+Math.floor(id/5)%5*17,imported:true};schools.push(s);db.importedSchools.push(s);added++;}else updated++;
+    for(const row of rows){const v=row.values;let s=matching(v);const existed=!!s;if(!s){const id=Math.max(-1,...schools.map(s=>s.id).filter(Number.isFinite))+1;s={id,name:v.name,district:v.district,address:v.address,type:v.type||'尚未提供',capacity:Number(v.capacity)||0,score:0,complete:0,trend:0,x:12+id%5*18,y:13+Math.floor(id/5)%5*17,imported:true};schools.push(s);db.importedSchools.push(s);added++;}else updated++;
       if(!districts.includes(s.district))districts.push(s.district);
       const sheet=st.sheets[st.sheetIndex],sourceRow=st.sourceRows?.[row.row-1]??row.row;
       for(const [k,raw]of Object.entries(v)){if(['name','district','address','type','year','schoolId'].includes(k)||raw==='')continue;const value=numericImportFields.includes(k)?Number(raw):raw;const col=st.mapping[k];const loc=sheet.fieldLocations?.[col]||sheet.locations?.[sourceRow]||`${sheet.name} · 第 ${sourceRow+1} 列`;const sourceValue=st.rows[row.row-1]?.[col]??raw;addObservation(s.id,String(v.year),k,value,st.file,loc,`${sheet.name}｜${st.headers[col]}：${sourceValue}${String(sourceValue)!==String(raw)?`\n人工確認後：${raw}`:''}`);if(records(s.id,v.year)[k].conflict)conflicts++;}
@@ -717,7 +741,7 @@
     const data=[['園所識別碼','園所名稱','行政區','資料年度',...workColumns.map(label),'已知加權分數','可評估權重(%)','異常數','資料狀態','規則版本']];
     const sources=[['園所識別碼','園所名稱','資料年度','欄位','數值','來源檔案','定位','原文／人工修正','取得時間','採用狀態']];
     const scores=[['園所識別碼','園所名稱','資料年度','規則','構面','權重(%)','規則分數','加權貢獻','計算依據','規則版本']];
-    for(const s of rows){const a=assessment(s),id=`${esc(s.officialId||('YA-'+String(s.id+1).padStart(4,'0')))}`;data.push([id,s.name,s.district,model.year,...workColumns.map(k=>records(s.id)[k]?.conflict?'來源衝突，待確認':current(s.id,k)?.value??''),a.score,a.coverage,a.anomalies,sourceState(s)==='conflict'?'來源衝突':a.coverage<60?'資料不足':'可評估',a.version]);for(const k of [...new Set(workColumns.flatMap(k=>k==='staffCostPerStudent'?[k,'staffCost','studentCount']:[k]))]){if(k==='staffCostPerStudent'){const c=current(s.id,k);sources.push([id,s.name,model.year,label(k),c?.value??'',c?.source??'',c?.locator??'年度人事費 ÷ 實際學生數',c?.excerpt??'來源缺漏、衝突或學生數無效',c?.at??'',c?'衍生計算':'暫無法計算']);continue;}const r=records(s.id)[k];if(!r){sources.push([id,s.name,model.year,label(k),'','','','','','缺資料']);continue;}for(const c of r.candidates)sources.push([id,s.name,model.year,label(k),c.value,c.source,c.locator,c.excerpt,c.at,r.conflict?'衝突待確認':r.chosen===c.id?'已採用':'保留未採用']);}for(const r of a.rows)scores.push([id,s.name,model.year,r.name,r.dimension,r.weight,r.raw??'資料不足',r.contribution??'暫不計入',r.formula,a.version]);}
+    for(const s of rows){const a=assessment(s),id=`${caseNumber(s.id)}`;data.push([id,s.name,s.district,model.year,...workColumns.map(k=>records(s.id)[k]?.conflict?'來源衝突，待確認':current(s.id,k)?.value??''),a.score,a.coverage,a.anomalies,sourceState(s)==='conflict'?'來源衝突':a.coverage<60?'資料不足':'可評估',a.version]);for(const k of [...new Set(workColumns.flatMap(k=>k==='staffCostPerStudent'?[k,'staffCost','studentCount']:[k]))]){if(k==='staffCostPerStudent'){const c=current(s.id,k);sources.push([id,s.name,model.year,label(k),c?.value??'',c?.source??'',c?.locator??'年度人事費 ÷ 實際學生數',c?.excerpt??'來源缺漏、衝突或學生數無效',c?.at??'',c?'衍生計算':'暫無法計算']);continue;}const r=records(s.id)[k];if(!r){sources.push([id,s.name,model.year,label(k),'','','','','','缺資料']);continue;}for(const c of r.candidates)sources.push([id,s.name,model.year,label(k),c.value,c.source,c.locator,c.excerpt,c.at,r.conflict?'衝突待確認':r.chosen===c.id?'已採用':'保留未採用']);}for(const r of a.rows)scores.push([id,s.name,model.year,r.name,r.dimension,r.weight,r.raw??'資料不足',r.contribution??'暫不計入',r.formula,a.version]);}
     try{downloadBlob(await workbookBlob([{name:'園所資料',rows:data},{name:'來源明細',rows:sources},{name:'評分明細',rows:scores}]),`幼安雷達_園所資料_${model.year}.xlsx`);toast(`已匯出 ${rows.length} 間園所、${workColumns.length} 個欄位與追溯明細`);}catch(e){toast('匯出失敗：'+e.message);}
   };
   fieldsPanel=()=>`<div class="panel"><div class="panel-head"><div><h2>欄位管理</h2><p>設定自訂匯入欄位與詳情顯示；計分用途由規則自動列出。</p></div><button class="primary" onclick="editField()">＋ 新增資料欄位</button></div><div class="table-wrap"><table><thead><tr><th>欄位名稱</th><th>類型／單位</th><th>預期資料來源</th><th>被哪些規則使用</th><th>詳情顯示</th><th>操作</th></tr></thead><tbody>${db.fields.map((f,i)=>{const used=db.rules.filter(r=>required[r.id]?.includes(f.key));return `<tr><td><b>${esc(f.name)}</b></td><td>${esc(f.type)}／${esc(f.unit||'—')}</td><td>${esc(f.source)}</td><td>${used.length?used.map(r=>`<div>${esc(r.name)} <small>（${r.enabled?'已啟用':'已停用'} · ${r.weight}%）</small></div>`).join(''):'<small>尚無規則使用，不計分</small>'}</td><td><label><input type="checkbox" aria-label="顯示${esc(f.name)}於詳情" ${f.show?'checked':''} onchange="Y.showField(${i},this.checked)"> 顯示</label></td><td><button class="link" onclick="editField(${i})">編輯欄位</button></td></tr>`;}).join('')}</tbody></table></div><div class="pad notice">新增自訂欄位可用於匯入對應、工作台與 Excel 匯出。預期來源只是描述，不會自動抓取；隱藏詳情欄位不會停用評分規則或隱藏判斷證據。</div></div>`;

@@ -63,6 +63,8 @@ class EndpointTests(unittest.TestCase):
             self.assertEqual(body["status"], "ok")
             self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
             self.assertEqual(response.headers["X-Frame-Options"], "DENY")
+            self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
+            self.assertIn("https://tile.openstreetmap.org", response.headers["Content-Security-Policy"])
 
     def test_field_map_endpoint(self):
         request = urllib.request.Request(

@@ -152,9 +152,10 @@
   }
   let evaluationContext={schoolId:0,year:115};
   const baseEvaluations=Y.evaluations;
-  Y.evaluations=(id,year=115)=>{evaluationContext={schoolId:Number(id),year:Number(year)};baseEvaluations(id,year);setTimeout(()=>{document.querySelectorAll('.evaluation-list .source-card').forEach(card=>{const file=card.querySelector('small')?.textContent;if((db.ocrFindings[evaluationContext.schoolId]||[]).some(x=>x.document===file))card.insertAdjacentHTML('afterbegin','<span class="confidence">AI 已擷取</span> ');});addFunctionHelp();},0)};
+  Y.evaluations=(id,year)=>{evaluationContext={schoolId:id,year:Number(year)||115};baseEvaluations(id,year);setTimeout(()=>{document.querySelectorAll('.evaluation-list .source-card').forEach(card=>{const file=card.querySelector('small')?.textContent;if((db.ocrFindings[evaluationContext.schoolId]||[]).some(x=>x.document===file))card.insertAdjacentHTML('afterbegin','<span class="confidence">AI 已擷取</span> ');});addFunctionHelp();},0)};
   const baseUploadEvaluation=Y.uploadEvaluation;
   Y.uploadEvaluation=async event=>{
+    event.preventDefault();
     const form=event.currentTarget||event.target,file=form.elements.file?.files?.[0],id=evaluationContext.schoolId,year=Number(form.elements.year?.value||evaluationContext.year);
     let text='';try{text=await extractEvaluationText(file)}catch{}
     await baseUploadEvaluation(event);
@@ -166,6 +167,7 @@
   const baseViewEvaluation=Y.viewEvaluation;
   Y.viewEvaluation=(schoolId,recordId)=>{
     const record=db.evaluationFiles?.[schoolId]?.find(r=>r.id===recordId);
+    if(record?.publicSummary){openModal('教育部評鑑摘要',`<h3>${esc(schoolById(schoolId).name)}</h3><pre style="white-space:pre-wrap">${esc(record.text)}</pre><div class="notice">此為公開結果摘要，非原始評鑑文件；可另上傳文件進行 OCR。</div>`);return;}
     let analysis=record?.aiAnalysis||(db.ocrFindings[schoolId]||[]).find(x=>x.recordId===recordId);
     if(!analysis&&record?.demo){analysis=demoOcr(record.text||'待改善 改善事項 設施設備維護',record.fileName);record.aiAnalysis=analysis;applyOcrFinding(schoolId,recordId,analysis);}
     if(!analysis){baseViewEvaluation(schoolId,recordId);return;}
@@ -197,16 +199,16 @@
   Y.refreshSentiment=async id=>{
     const raw=demoClues[id]||db.sentimentEvents[id]||[];let result;
     try{result=await apiPost('/api/ai/sentiment',{events:raw})}catch{result={events:localSentiment(raw),provider:'瀏覽器內 Demo 情緒分析'}}
-    db.sentimentEvents[id]=result.events;persist();if(page==='detail'&&Number(id)===selected)detail();toast('Demo AI 已完成去重與嚴重度分析');
+    db.sentimentEvents[id]=result.events;persist();if(page==='detail'&&String(id)===String(selected))detail();toast('Demo AI 已完成去重與嚴重度分析');
   };
 
   function ocrPanel(id){
     const groups=db.ocrFindings[id]||[],findings=groups.flatMap(group=>group.findings||[]);
-    return `<section class="panel"><div class="panel-head"><div><h2>評鑑 OCR 與合規檢核</h2><p>從文件擷取待改善事項，連回可能適用的法規。</p></div><button onclick="Y.evaluations(${id})">查看／上傳文件</button></div>${findings.length?`<div class="finding-list">${findings.slice(0,4).map(f=>`<article class="finding ${Number(f.riskImpact)>=20?'high':''}"><h3>${esc(f.category)}</h3><p>${esc(f.summary)}</p><footer><span>${esc(f.clause)}</span><span>風險影響 +${Number(f.riskImpact||0)} 分</span></footer></article>`).join('')}</div>`:'<div class="pad muted">尚無 OCR 擷取結果，可上傳評鑑文件開始分析。</div>'}<div class="notice ocr-notice">Demo AI 輔助結果，須核對原始文件與完整法規。</div><div style="height:14px"></div></section>`;
+    return `<section class="panel"><div class="panel-head"><div><h2>評鑑 OCR 與合規檢核</h2><p>從文件擷取待改善事項，連回可能適用的法規。</p></div><button onclick="Y.evaluations(${esc(JSON.stringify(id))})">查看／上傳文件</button></div>${findings.length?`<div class="finding-list">${findings.slice(0,4).map(f=>`<article class="finding ${Number(f.riskImpact)>=20?'high':''}"><h3>${esc(f.category)}</h3><p>${esc(f.summary)}</p><footer><span>${esc(f.clause)}</span><span>風險影響 +${Number(f.riskImpact||0)} 分</span></footer></article>`).join('')}</div>`:'<div class="pad muted">尚無 OCR 擷取結果，可上傳評鑑文件開始分析。</div>'}<div class="notice ocr-notice">Demo AI 輔助結果，須核對原始文件與完整法規。</div><div style="height:14px"></div></section>`;
   }
   function sentimentPanel(id){
     const events=db.sentimentEvents[id]||[];
-    return `<section class="panel"><div class="panel-head"><div><h2>AI 輿情預警時間軸</h2><p>已去除重複事件，保留可回查的公開來源。</p></div><button onclick="Y.refreshSentiment(${id})">重新分析</button></div><div class="clue-timeline">${events.length?events.map(event=>{const url=safeUrl(event.url);return `<article class="clue ${event.severity==='高'?'high':''}"><div class="clue-meta"><span>${esc(event.date||'日期不明')}</span><span class="unverified">未經查證之公開線索</span><span>負向 ${Number(event.negativeScore||0)} · ${esc(event.severity||'低')}</span></div><h3>${esc(event.title)}</h3><p>${esc(event.aiSummary||event.excerpt||'')}</p><div class="clue-meta"><span>${esc(event.source||'公開來源')}</span>${url?`<a class="source-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer nofollow">查看來源 ↗</a>`:''}</div></article>`}).join(''):'<div class="pad muted">目前沒有公開線索。</div>'}</div><div class="notice ocr-notice">公開線索僅供決定是否進一步查核，不代表事件屬實。</div><div style="height:14px"></div></section>`;
+    return `<section class="panel"><div class="panel-head"><div><h2>AI 輿情預警時間軸</h2><p>已去除重複事件，保留可回查的公開來源。</p></div><button onclick="Y.refreshSentiment(${esc(JSON.stringify(id))})">重新分析</button></div><div class="clue-timeline">${events.length?events.map(event=>{const url=safeUrl(event.url);return `<article class="clue ${event.severity==='高'?'high':''}"><div class="clue-meta"><span>${esc(event.date||'日期不明')}</span><span class="unverified">未經查證之公開線索</span><span>負向 ${Number(event.negativeScore||0)} · ${esc(event.severity||'低')}</span></div><h3>${esc(event.title)}</h3><p>${esc(event.aiSummary||event.excerpt||'')}</p><div class="clue-meta"><span>${esc(event.source||'公開來源')}</span>${url?`<a class="source-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer nofollow">查看來源 ↗</a>`:''}</div></article>`}).join(''):'<div class="pad muted">目前沒有公開線索。</div>'}</div><div class="notice ocr-notice">公開線索僅供決定是否進一步查核，不代表事件屬實。</div><div style="height:14px"></div></section>`;
   }
   function auditResultPanel(id,forDetail=false){
     const result=db.auditResults[id];if(!result)return '';
@@ -224,7 +226,7 @@
         const badge=advicePanel.querySelector('.panel-head .pill');if(badge)badge.textContent='Demo fallback';
       }
     }
-    document.querySelector('.heading')?.insertAdjacentHTML('afterend',`<div class="feature-strip"><button class="feature-chip" onclick="Y.evaluations(${id})"><span class="help-icon">!</span><span><b>評鑑 OCR</b><small>上傳文件、擷取缺失與法規</small></span></button><button class="feature-chip" onclick="document.getElementById('sentiment-panel')?.scrollIntoView({behavior:'smooth'})"><span class="help-icon">!</span><span><b>輿情預警</b><small>事件去重、嚴重度與來源</small></span></button><button class="feature-chip" onclick="${db.reviews[id]?.saved?`go('case',${id})`:'arrange()'}"><span class="help-icon">!</span><span><b>查核閉環</b><small>覆核、調查、回填與結案</small></span></button></div>`);
+    document.querySelector('.heading')?.insertAdjacentHTML('afterend',`<div class="feature-strip"><button class="feature-chip" onclick="Y.evaluations(${esc(JSON.stringify(id))})"><span class="help-icon">!</span><span><b>評鑑 OCR</b><small>上傳文件、擷取缺失與法規</small></span></button><button class="feature-chip" onclick="document.getElementById('sentiment-panel')?.scrollIntoView({behavior:'smooth'})"><span class="help-icon">!</span><span><b>輿情預警</b><small>事件去重、嚴重度與來源</small></span></button><button class="feature-chip" onclick="${db.reviews[id]?.saved?`go('case',${esc(JSON.stringify(id))})`:'arrange()'}"><span class="help-icon">!</span><span><b>查核閉環</b><small>覆核、調查、回填與結案</small></span></button></div>`);
     host.insertAdjacentHTML('beforeend',ocrPanel(id));
     host.insertAdjacentHTML('beforeend',`<div id="sentiment-panel">${sentimentPanel(id)}</div>`);
     const result=auditResultPanel(id,true);if(result)host.insertAdjacentHTML('beforeend',result);
@@ -234,7 +236,7 @@
   /* Issue #12: case lifecycle, Kanban view, and result feedback. */
   function kanbanBoard(){
     const records=auditRecords(),stages=['待處理','調查中','待補件','已完成'];
-    return `<section class="panel issue-kanban"><div class="panel-head"><div><h2>案件生命週期</h2><p>從待查核到結案，一眼看出案件卡在哪一步。</p></div></div><div class="kanban-grid">${stages.map(stage=>{const rows=records.filter(({c})=>c.stage===stage);return `<div class="kanban-col"><h3>${stageNames[stage]} <span>${rows.length}</span></h3>${rows.map(({s,c})=>`<button class="kanban-card" onclick="go('case',${s.id})"><b>${esc(s.name)}</b><small>${esc(c.owner||'未指派')} · ${esc(c.due||'未設定期限')}</small><small>${pendingActions(c).length} 項待完成</small></button>`).join('')||'<small class="muted">目前無案件</small>'}</div>`}).join('')}</div></section>`;
+    return `<section class="panel issue-kanban"><div class="panel-head"><div><h2>案件生命週期</h2><p>從待查核到結案，一眼看出案件卡在哪一步。</p></div></div><div class="kanban-grid">${stages.map(stage=>{const rows=records.filter(({c})=>c.stage===stage);return `<div class="kanban-col"><h3>${stageNames[stage]} <span>${rows.length}</span></h3>${rows.map(({s,c})=>`<button class="kanban-card" onclick="go('case',${esc(JSON.stringify(s.id))})"><b>${esc(s.name)}</b><small>${esc(c.owner||'未指派')} · ${esc(c.due||'未設定期限')}</small><small>${pendingActions(c).length} 項待完成</small></button>`).join('')||'<small class="muted">目前無案件</small>'}</div>`}).join('')}</div></section>`;
   }
   const baseAssignedAudit=auditPage;
   auditPage=()=>{
@@ -306,7 +308,7 @@
     const paragraph=(text,{size=20,color='#26394b',indent=0,gap=16}={})=>{ctx.font=`${size}px sans-serif`;ctx.fillStyle=color;const lines=wrappedLines(ctx,text,WIDTH-MARGIN*2-indent);for(const line of lines){ensure(size+13);ctx.fillText(line,MARGIN+indent,y);y+=size+12;}y+=gap};
     const pair=(left,right)=>{ensure(60);ctx.fillStyle='#607386';ctx.font='18px sans-serif';ctx.fillText(left,MARGIN,y);ctx.fillStyle='#1f3347';ctx.font='700 19px sans-serif';ctx.fillText(right,MARGIN+220,y);y+=39};
     createPage();const school=schoolById(d.id),review=db.reviews[d.id]||{},c=ensureCase(d.id),result=db.auditResults[d.id];
-    title(school.name,38);paragraph(`案件編號 YA-${String(school.id+1).padStart(4,'0')}　｜　產製時間 ${d.date}`,{size:18,color:'#607386'});rule();
+    title(school.name,38);paragraph(`案件編號 ${caseNumber(school.id)}　｜　產製時間 ${d.date}`,{size:18,color:'#607386'});rule();
     label('交辦資訊');pair('交付局處',d.agency);pair('負責人',d.owner);pair('處理期限',d.due);pair('案件狀態',stageNames[c.stage]||c.stage);rule();
     label('園所與交辦說明');paragraph(`${school.type}｜${school.district}｜核定 ${school.capacity} 人\n${school.address}`);paragraph(d.purpose,{color:'#1f3347'});rule();
     label('人工覆核摘要');paragraph(`${review.status||'尚未覆核'}｜${review.owner||'未指派'}\n${review.note||'未填寫覆核備註'}`);rule();
@@ -317,7 +319,7 @@
     rule();label('承辦人電子簽名');ensure(220);paragraph(`${d.profile.department}｜${d.profile.title||'承辦人'}｜${d.profile.name}\n簽署時間：${d.date}`,{size:18,gap:6});
     try{const signature=await loadImage(d.profile.signature);ctx.drawImage(signature,MARGIN,y,360,Math.min(140,360*signature.height/signature.width));y+=155;}catch{paragraph('簽名影像無法顯示');}
     paragraph('AI 分析與公開線索僅供查核排序及輔助判斷，不作為違法認定或行政裁處的直接依據。',{size:15,color:'#6b7885'});
-    pages.forEach((page,index)=>{const g=page.getContext('2d');g.strokeStyle='#d8e0e8';g.beginPath();g.moveTo(MARGIN,HEIGHT-76);g.lineTo(WIDTH-MARGIN,HEIGHT-76);g.stroke();g.fillStyle='#6b7885';g.font='15px sans-serif';g.fillText(`YA-${String(school.id+1).padStart(4,'0')}｜幼安雷達 Demo`,MARGIN,HEIGHT-45);g.textAlign='right';g.fillText(`第 ${index+1} / ${pages.length} 頁`,WIDTH-MARGIN,HEIGHT-45);});
+    pages.forEach((page,index)=>{const g=page.getContext('2d');g.strokeStyle='#d8e0e8';g.beginPath();g.moveTo(MARGIN,HEIGHT-76);g.lineTo(WIDTH-MARGIN,HEIGHT-76);g.stroke();g.fillStyle='#6b7885';g.font='15px sans-serif';g.fillText(`${caseNumber(school.id)}｜幼安雷達 Demo`,MARGIN,HEIGHT-45);g.textAlign='right';g.fillText(`第 ${index+1} / ${pages.length} 頁`,WIDTH-MARGIN,HEIGHT-45);});
     return pages;
   }
   const canvasJpeg=canvas=>new Promise((resolve,reject)=>canvas.toBlob(async blob=>{if(!blob){reject(Error('無法建立 PDF 頁面'));return;}resolve(new Uint8Array(await blob.arrayBuffer()));},'image/jpeg',0.92));
@@ -335,7 +337,7 @@
   prepareReport=async event=>{await basePrepareReport(event);const button=Array.from(document.querySelectorAll('#modal button')).find(node=>node.getAttribute('onclick')==='downloadReport()');if(button)button.textContent='下載 A4 PDF';document.querySelector('.report-paper')?.insertAdjacentHTML('afterbegin','<div class="pdf-proof">將產生真實 PDF 與簽名影像</div>');};
   downloadReport=async()=>{
     const d=exportDraft;if(!d?.profile?.signature){toast('請先設定承辦人簽名');return;}const button=Array.from(document.querySelectorAll('#modal button')).find(node=>node.getAttribute('onclick')==='downloadReport()');if(button){button.disabled=true;button.textContent='正在產生 PDF…';}
-    try{const canvases=await renderReportCanvases(d),pdf=await canvasesToPdf(canvases),caseNumber=`YA-${String(d.id+1).padStart(4,'0')}`,filename=`幼安雷達_稽核交辦單_${caseNumber}.pdf`,c=ensureCase(d.id);downloadBlob(pdf,filename);Object.assign(c,{agency:d.agency,owner:d.owner,due:d.due});c.timeline.unshift({at:stamp(),text:`已產生含簽名 A4 PDF；交付 ${d.agency}，簽署人 ${d.profile.name}。`});persist();openModal('PDF 已下載',`<div class="success-mark">✓</div><h2>含簽名交辦單已產生</h2><p style="margin-top:12px">${esc(filename)}</p><p class="muted">共 ${canvases.length} 頁 · 已附 ${esc(d.profile.name)} 的簽名與產製時間</p><div class="form-actions"><button class="primary" onclick="closeModal();go('case',${d.id})">回到案件</button></div>`);}catch(error){toast('PDF 產生失敗：'+error.message);if(button){button.disabled=false;button.textContent='重新產生 PDF';}}
+    try{const canvases=await renderReportCanvases(d),pdf=await canvasesToPdf(canvases),reportNumber=caseNumber(d.id),filename=`幼安雷達_稽核交辦單_${reportNumber}.pdf`,c=ensureCase(d.id);downloadBlob(pdf,filename);Object.assign(c,{agency:d.agency,owner:d.owner,due:d.due});c.timeline.unshift({at:stamp(),text:`已產生含簽名 A4 PDF；交付 ${d.agency}，簽署人 ${d.profile.name}。`});persist();openModal('PDF 已下載',`<div class="success-mark">✓</div><h2>含簽名交辦單已產生</h2><p style="margin-top:12px">${esc(filename)}</p><p class="muted">共 ${canvases.length} 頁 · 已附 ${esc(d.profile.name)} 的簽名與產製時間</p><div class="form-actions"><button class="primary" onclick="closeModal();go('case',${esc(JSON.stringify(d.id))})">回到案件</button></div>`);}catch(error){toast('PDF 產生失敗：'+error.message);if(button){button.disabled=false;button.textContent='重新產生 PDF';}}
   };
 
   const demoBadge=document.querySelector('.topline .demo');if(demoBadge)demoBadge.textContent='Demo AI · 合成資料 · 自動保存';

@@ -392,12 +392,12 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' blob:; "
-            "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org; connect-src 'self'; "
             "worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
         )
         super().end_headers()
