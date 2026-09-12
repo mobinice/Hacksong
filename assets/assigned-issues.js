@@ -29,8 +29,8 @@
 
   Object.assign(functionHelp,{
     mapping:{title:'AI 語意欄位對應',intro:'AI 依欄位名稱與內容線索，建議對應到平台的標準欄位。',steps:['實際讀取 Excel、CSV 或固定格式文件。','比較不同局處的非標準欄名與平台欄位。','顯示信心分數與判斷理由；低信心項目標示待覆核。','承辦人可調整對應，確認後才寫入 Demo。'],note:'目前使用可解釋的 Demo AI 規則，不呼叫付費模型；所有建議都必須人工確認。'},
-    import:{title:'AI 智慧資料匯入',intro:'將不同局處提供的 Excel、CSV 或文件整理為一致的園所資料。',steps:['勾選本次需要的資料類別。','實際讀取本機檔案並找出表頭。','Demo AI 建議欄位對應並標示信心分數。','人工確認資料列後才匯入，並立即重算統計與風險。'],note:'檔案在瀏覽器本機處理；重新整理後所有操作會回到初始展示狀態。'},
-    signature:{title:'個人電子簽名',intro:'匯入承辦人的簽名圖片，放入正式 A4 稽核交辦單。',steps:['設定姓名、職稱與所屬局處。','讀取 PNG／JPG 簽名並立即預覽。','匯出前再次確認簽署人與交付局處。','下載的 PDF 帶入簽名影像與產製時間。'],note:'Demo 只在目前頁面記憶簽名；重新整理即清除操作紀錄並回復示範簽名。'},
+    import:{title:'AI 智慧資料匯入',intro:'將不同局處提供的 Excel、CSV 或文件整理為一致的園所資料。',steps:['勾選本次需要的資料類別。','實際讀取本機檔案並找出表頭。','Demo AI 建議欄位對應並標示信心分數。','人工確認資料列後才匯入，並立即重算統計與風險。'],note:'檔案在瀏覽器本機處理；確認匯入後的資料與操作紀錄會保存，重新整理後仍可繼續。'},
+    signature:{title:'個人電子簽名',intro:'匯入承辦人的簽名圖片，放入正式 A4 稽核交辦單。',steps:['設定姓名、職稱與所屬局處。','讀取 PNG／JPG 簽名並立即預覽。','匯出前再次確認簽署人與交付局處。','下載的 PDF 帶入簽名影像與產製時間。'],note:'簽名會隨案件設定保存；重新整理後仍會保留，可隨時重新匯入或使用手動重設。'},
     pdf:{title:'含簽名 PDF 交辦',intro:'把案件、覆核、AI 建議與後續行動整理成可交付的 A4 PDF。',steps:['填寫局處、負責人、期限與交辦說明。','預覽園所、覆核摘要、查核清單與行動。','確認承辦人簽名與產製時間。','下載「幼安雷達_稽核交辦單_YA-XXXX.pdf」。'],note:'Demo 會在瀏覽器直接產生真實 PDF 檔，不會寄送或上傳。'},
     ocr:{title:'評鑑 OCR 與合規檢核',intro:'從評鑑文件擷取待改善事項，對照法規並交由承辦人覆核。',steps:['上傳 PDF、掃描圖片或文件。','Demo OCR 擷取關鍵文字與改善事項。','顯示可能涉及的法規與風險影響。','結果加入園所 360 與風險理由，但仍須人工確認。'],note:'掃描件使用合成 OCR 結果展示流程，畫面會清楚標示 Demo AI。'},
     sentiment:{title:'AI 輿情預警',intro:'將公開新聞與討論整理成可查證的事件線索。',steps:['彙整公開來源的標題、摘要與日期。','去除同一事件的重複內容。','標示負向分數與嚴重度。','保留來源連結，供承辦人交叉查證。'],note:'所有項目均標示「未經查證之公開線索」，不能直接作為裁處依據。'},
@@ -101,7 +101,7 @@
   /* Issue #13: surface implemented controls without exposing deployment secrets. */
   Y.securityDetails=()=>openModal('資安與合規控制',`<div class="security-grid"><div class="security-control"><b>私有檔案</b><small>S3 阻擋所有公開存取</small></div><div class="security-control"><b>靜態加密</b><small>SSE-S3（AES-256）</small></div><div class="security-control"><b>短效下載</b><small>預簽網址到期後失效</small></div><div class="security-control"><b>敏感資料</b><small>身分證、手機、Email 遮罩</small></div></div><div class="notice">Demo 不保存 AWS 金鑰；部署使用執行個體角色或環境密鑰。CI 會掃描常見憑證格式與停用 TLS 驗證的程式碼。</div><div class="form-actions"><button class="primary" onclick="closeModal()">了解</button></div>`);
   const baseAssignedSettings=settings;
-  settings=()=>{baseAssignedSettings();if(!document.querySelector('.security-card'))document.querySelector('#page')?.insertAdjacentHTML('beforeend',`<section class="panel security-card"><div class="panel-head"><div><h2>資安與敏感資料保護</h2><p>部署控制已納入範本；Demo 狀態重新整理即清除。</p></div><button onclick="Y.securityDetails()">查看控制說明</button></div><div class="security-grid"><div class="security-control"><b>Public Access Block</b><small>四項全部啟用</small></div><div class="security-control"><b>SSE-S3</b><small>AES-256 靜態加密</small></div><div class="security-control"><b>PII Masking</b><small>API 回傳前可遮罩</small></div><div class="security-control"><b>Secret Scan</b><small>PR 與部署前檢查</small></div></div></section>`);addFunctionHelp();};
+  settings=()=>{baseAssignedSettings();if(!document.querySelector('.security-card'))document.querySelector('#page')?.insertAdjacentHTML('beforeend',`<section class="panel security-card"><div class="panel-head"><div><h2>資安與敏感資料保護</h2><p>部署控制已納入範本；Demo 狀態會持久保存。</p></div><button onclick="Y.securityDetails()">查看控制說明</button></div><div class="security-grid"><div class="security-control"><b>Public Access Block</b><small>四項全部啟用</small></div><div class="security-control"><b>SSE-S3</b><small>AES-256 靜態加密</small></div><div class="security-control"><b>PII Masking</b><small>API 回傳前可遮罩</small></div><div class="security-control"><b>Secret Scan</b><small>PR 與部署前檢查</small></div></div></section>`);addFunctionHelp();};
 
   /* Issue #9: evaluation OCR and compliance findings. */
   const demoOcr=(text,fileName='')=>{
@@ -285,7 +285,7 @@
     try{const url=await readDataUrl(file),image=await loadImage(url);if(image.width>4000||image.height>4000)throw Error('圖片尺寸不可超過 4000 × 4000');signatureDraft=url;if(preview){const node=document.createElement('img');node.src=url;node.alt='個人簽名預覽';preview.replaceChildren(node);}if(error)error.textContent='';toast('已讀取簽名圖片；儲存後可帶入 PDF');}catch(err){if(error)error.textContent=err.message;}
   };
   const baseProfileModal=profileModal;
-  profileModal=()=>{baseProfileModal();const note=document.querySelector('#modal .notice');if(note)note.textContent='PNG／JPG 會在本頁實際讀取並帶入 PDF；Demo 重新整理後回到初始示範簽名。';};
+  profileModal=()=>{baseProfileModal();const note=document.querySelector('#modal .notice');if(note)note.textContent='PNG／JPG 會實際讀取、保存並帶入 PDF；重新整理後仍會保留。';};
 
   function wrappedLines(ctx,text,width){
     const output=[];
@@ -338,6 +338,6 @@
     try{const canvases=await renderReportCanvases(d),pdf=await canvasesToPdf(canvases),caseNumber=`YA-${String(d.id+1).padStart(4,'0')}`,filename=`幼安雷達_稽核交辦單_${caseNumber}.pdf`,c=ensureCase(d.id);downloadBlob(pdf,filename);Object.assign(c,{agency:d.agency,owner:d.owner,due:d.due});c.timeline.unshift({at:stamp(),text:`已產生含簽名 A4 PDF；交付 ${d.agency}，簽署人 ${d.profile.name}。`});persist();openModal('PDF 已下載',`<div class="success-mark">✓</div><h2>含簽名交辦單已產生</h2><p style="margin-top:12px">${esc(filename)}</p><p class="muted">共 ${canvases.length} 頁 · 已附 ${esc(d.profile.name)} 的簽名與產製時間</p><div class="form-actions"><button class="primary" onclick="closeModal();go('case',${d.id})">回到案件</button></div>`);}catch(error){toast('PDF 產生失敗：'+error.message);if(button){button.disabled=false;button.textContent='重新產生 PDF';}}
   };
 
-  const demoBadge=document.querySelector('.topline .demo');if(demoBadge)demoBadge.textContent='Demo AI · 合成資料 · 重新整理即重置';
+  const demoBadge=document.querySelector('.topline .demo');if(demoBadge)demoBadge.textContent='Demo AI · 合成資料 · 自動保存';
   recalculate('載入 OCR 與案件回填示範');
 })();
