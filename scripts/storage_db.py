@@ -279,7 +279,7 @@ def _save_state_rds(state_dict, state_key="db_state"):
                         continue
 
             # 同步 cases
-            cases = state_dict.get("cases", {})
+            cases = {**state_dict.get("cases", {}), **state_dict.get("casework", {})}
             if isinstance(cases, dict):
                 for c_id_str, c in cases.items():
                     try:
@@ -356,7 +356,7 @@ def _save_state_sqlite(state_dict, db_path=None, state_key="db_state"):
                 except (ValueError, TypeError):
                     continue
 
-        cases = state_dict.get("cases", {})
+        cases = {**state_dict.get("cases", {}), **state_dict.get("casework", {})}
         if isinstance(cases, dict):
             for c_id_str, c in cases.items():
                 try:
@@ -427,7 +427,7 @@ def reset_db(db_path=None, state_key="db_state"):
     """Reset only the selected workspace; other workspace records remain intact."""
     state = get_state(db_path, state_key=state_key).get("data") or {}
     reviews = [int(key) for key in state.get("reviews", {}) if str(key).isdigit()]
-    cases = [int(key) for key in state.get("casework", {}) if str(key).isdigit()]
+    cases = [int(key) for key in {**state.get("cases", {}), **state.get("casework", {})} if str(key).isdigit()]
     def clear(conn, placeholder):
         cursor = conn.cursor()
         cursor.execute(f"DELETE FROM app_state WHERE key = {placeholder}", (state_key,))

@@ -51,6 +51,8 @@ class WorkspaceTests(unittest.TestCase):
             restored=storage_db.get_state()['data']
             self.assertEqual(restored['reviews'][str(key)]['status'],'資料不足待補充')
             self.assertEqual(restored['casework'][str(key)]['stage'],'待處理')
+            with storage_db.get_sqlite_connection() as conn:
+                self.assertEqual(conn.execute('SELECT school_id FROM cases').fetchone()[0],key)
 
 class NamespaceTests(unittest.TestCase):
     def test_saving_and_resetting_one_workspace_preserves_the_other(self):
