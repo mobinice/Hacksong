@@ -10,9 +10,30 @@ import urllib.parse
 import json
 import os
 import sys
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def load_dotenv(path=None):
+    if path is None:
+        path = os.path.join(BASE_DIR, ".env")
+    if not os.path.exists(path):
+        return
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k = k.strip()
+            v = v.strip().strip('"').strip("'")
+            if k and k not in os.environ:
+                os.environ[k] = v
+
+load_dotenv()
+
 from scripts.crawl_moe import create_session, fetch_district_schools, enrich_risk_metrics, generate_insights
 
-PORT = 8088
+PORT = int(os.environ.get("PORT", 8088))
 
 class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -156,21 +177,25 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 )
                 
                 advice_data = None
-                model_used = "us.amazon.nova-pro-v1:0"
+                aws_region = os.environ.get("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "us-west-2"))
+                primary_model = os.environ.get("BEDROCK_MODEL_ID", "us.amazon.nova-pro-v1:0")
+                fallback_model = os.environ.get("BEDROCK_FALLBACK_MODEL_ID", "us.amazon.nova-lite-v1:0")
+                model_used = primary_model
+
                 try:
                     import boto3
-                    client = boto3.client('bedrock-runtime', region_name='us-west-2')
+                    client = boto3.client('bedrock-runtime', region_name=aws_region)
                     try:
                         resp = client.converse(
-                            modelId='us.amazon.nova-pro-v1:0',
+                            modelId=primary_model,
                             system=[{'text': system_prompt}],
                             messages=[{'role': 'user', 'content': [{'text': user_prompt}]}],
                             inferenceConfig={'temperature': 0.1, 'maxTokens': 1800}
                         )
                     except Exception as model_err:
-                        model_used = "us.amazon.nova-lite-v1:0"
+                        model_used = fallback_model
                         resp = client.converse(
-                            modelId='us.amazon.nova-lite-v1:0',
+                            modelId=fallback_model,
                             system=[{'text': system_prompt}],
                             messages=[{'role': 'user', 'content': [{'text': user_prompt}]}],
                             inferenceConfig={'temperature': 0.1, 'maxTokens': 1500}
