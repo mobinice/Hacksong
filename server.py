@@ -33,6 +33,7 @@ load_dotenv()
 
 from scripts.crawl_moe import create_session, fetch_district_schools, enrich_risk_metrics, generate_insights
 from scripts.storage_db import init_db, save_state, get_state, reset_db, get_stats
+from scripts.risk_engine import evaluate_school_risk, recalculate_all_schools, DEFAULT_RULES, DEFAULT_THRESHOLDS
 
 # 初始化 SQLite 本地持久化資料庫
 init_db()
@@ -43,8 +44,14 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         # 允許跨來源與關閉快取
         self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD')
+        self.send_header('Access-Control-Allow-Headers', '*')
         self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.end_headers()
 
     def do_HEAD(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -118,6 +125,53 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps({
                 "status": "success",
                 "stats": stats
+            }, ensure_ascii=False).encode('utf-8'))
+            return
+
+        # 5. API: 動態四構面風險計算園所清單
+        elif path == "/api/risk/schools":
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            
+            state_info = get_state()
+            state_data = state_info.get("data") or {}
+            current_rules = state_data.get("rules", DEFAULT_RULES)
+            current_thresholds = state_data.get("thresholds", DEFAULT_THRESHOLDS)
+
+            names = ['幸福','晨光','小橡樹','向陽','禾苗','彩虹','童心','小星星','蒲公英','暖陽','森林','青田','小樹屋','果實','晴空','樂田','花鹿','小太陽','星河','月芽','藍天','小海豚']
+            districts = ['板橋區','新莊區','三重區','中和區','淡水區','汐止區']
+            raw_schools = [{
+                "id": i,
+                "name": f"{n}幼兒園",
+                "district": districts[i % 6],
+                "address": f"新北市{districts[i % 6]}示範路{18 + i * 7}號",
+                "complete": 34 + (i - 18) * 7 if i >= 18 else (91 - i % 7),
+                "capacity": 120 + i * 5
+            } for i, n in enumerate(names)]
+
+            result = recalculate_all_schools(raw_schools, current_rules, current_thresholds)
+            self.wfile.write(json.dumps({
+                "status": "success",
+                "count": len(result["schools"]),
+                "stats": result["stats"],
+                "schools": result["schools"],
+                "rules": result["rulesUsed"],
+                "thresholds": result["thresholdsUsed"]
+            }, ensure_ascii=False).encode('utf-8'))
+            return
+
+        # 6. API: 取得當前風險規則與門檻設定
+        elif path == "/api/risk/rules":
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            state_info = get_state()
+            state_data = state_info.get("data") or {}
+            self.wfile.write(json.dumps({
+                "status": "success",
+                "rules": state_data.get("rules", DEFAULT_RULES),
+                "thresholds": state_data.get("thresholds", DEFAULT_THRESHOLDS)
             }, ensure_ascii=False).encode('utf-8'))
             return
 
@@ -327,13 +381,66 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
             return
 
+        # 7. API: 接收自訂規則或門檻，動態重新計算所有園所風險並同步保存
+        elif parsed.path == "/api/risk/recalculate":
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_body = self.rfile.read(content_length).decode('utf-8')
+            try:
+                payload = json.loads(post_body) if post_body else {}
+                custom_rules = payload.get("rules")
+                custom_thresholds = payload.get("thresholds")
+
+                state_info = get_state()
+                db_data = state_info.get("data") or {}
+                if custom_rules:
+                    db_data["rules"] = custom_rules
+                if custom_thresholds:
+                    db_data["thresholds"] = custom_thresholds
+                
+                # 持久化更新至 SQLite
+                save_state(db_data)
+
+                # 準備示範園所資料
+                names = ['幸福','晨光','小橡樹','向陽','禾苗','彩虹','童心','小星星','蒲公英','暖陽','森林','青田','小樹屋','果實','晴空','樂田','花鹿','小太陽','星河','月芽','藍天','小海豚']
+                districts = ['板橋區','新莊區','三重區','中和區','淡水區','汐止區']
+                raw_schools = [{
+                    "id": i,
+                    "name": f"{n}幼兒園",
+                    "district": districts[i % 6],
+                    "address": f"新北市{districts[i % 6]}示範路{18 + i * 7}號",
+                    "complete": 34 + (i - 18) * 7 if i >= 18 else (91 - i % 7),
+                    "capacity": 120 + i * 5
+                } for i, n in enumerate(names)]
+
+                result = recalculate_all_schools(raw_schools, db_data.get("rules", DEFAULT_RULES), db_data.get("thresholds", DEFAULT_THRESHOLDS))
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "success",
+                    "stats": result["stats"],
+                    "schools": result["schools"],
+                    "rules": result["rulesUsed"],
+                    "thresholds": result["thresholdsUsed"],
+                    "message": "園所風險分數與 4 構面已動態重新計算並儲存至 SQLite"
+                }, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+            return
+
         self.send_response(404)
         self.end_headers()
 
+class ThreadingServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
 def run_server():
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", PORT), RadarAPIHandler) as httpd:
-        print(f"📡 幼安雷達後端伺服器 (附帶教育部 Live API) 運行於 http://localhost:{PORT}")
+    with ThreadingServer(("", PORT), RadarAPIHandler) as httpd:
+        print(f"📡 幼安雷達後端伺服器 (多執行緒版) 運行於 http://localhost:{PORT}")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
