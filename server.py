@@ -1,488 +1,654 @@
 #!/usr/bin/env python3
-"""
-幼安雷達 - 後端 API 與靜態檔案伺服器
-提供真實教育部全國教保網資料 API、即時爬蟲端點與主管機關 Insights 分析。
+"""幼安雷達 Demo API 與靜態檔案伺服器。
+
+AI 端點提供可解釋的本機模擬結果，讓介面在沒有雲端憑證時仍可完整展示；
+回應中的 ``demo`` 與 ``provider`` 欄位會明確標示資料性質。
 """
 
+from __future__ import annotations
+
+import hashlib
 import http.server
-import socketserver
-import urllib.parse
 import json
 import os
-import sys
+import re
+import socketserver
+import threading
+import time
+import urllib.parse
+from collections import defaultdict, deque
+from pathlib import Path
+from typing import Any
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = Path(__file__).resolve().parent
 
-def load_dotenv(path=None):
-    if path is None:
-        path = os.path.join(BASE_DIR, ".env")
-    if not os.path.exists(path):
+
+def load_dotenv(path: Path | None = None) -> None:
+    """Load local development settings without overriding process credentials."""
+    env_path = path or BASE_DIR / ".env"
+    if not env_path.exists():
         return
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
+    try:
+        for line in env_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
-            k, v = line.split("=", 1)
-            k = k.strip()
-            v = v.strip().strip('"').strip("'")
-            if k and k not in os.environ:
-                os.environ[k] = v
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if key and key not in os.environ:
+                os.environ[key] = value.strip().strip('"').strip("'")
+    except OSError:
+        return
+
 
 load_dotenv()
 
-from scripts.crawl_moe import create_session, fetch_district_schools, enrich_risk_metrics, generate_insights
-from scripts.storage_db import init_db, save_state, get_state, reset_db, get_stats, migrate_sqlite_to_rds
-from scripts.risk_engine import evaluate_school_risk, recalculate_all_schools, DEFAULT_RULES, DEFAULT_THRESHOLDS
+from scripts.crawl_moe import create_session, enrich_risk_metrics, fetch_district_schools
+from scripts.risk_engine import DEFAULT_RULES, DEFAULT_THRESHOLDS, recalculate_all_schools
+from scripts.storage_db import get_state, get_stats, init_db, reset_db, save_state
 
-# 初始化持久化資料庫 (優先連線 AWS RDS PostgreSQL，備援本地 SQLite)
+
 init_db()
 
-PORT = int(os.environ.get("PORT", 8088))
+PORT = int(os.environ.get("YOUAN_PORT", os.environ.get("PORT", "8088")))
+MAX_BODY_BYTES = 2 * 1024 * 1024
+ALLOWED_ORIGINS = {
+    "http://127.0.0.1:8088",
+    "http://localhost:8088",
+    "http://127.0.0.1:8765",
+    "http://localhost:8765",
+}
+
+STANDARD_FIELDS = {
+    "name": ["園所名稱", "機構名稱", "幼兒園名稱", "單位名稱", "school", "name"],
+    "district": ["行政區", "區域", "鄉鎮市區", "所在區", "district", "area"],
+    "address": ["地址", "機構地址", "園址", "所在地", "address"],
+    "telephone": ["電話", "聯絡電話", "聯絡方式", "tel", "phone"],
+    "capacity": ["核定人數", "核定規模", "招生人數", "容量", "capacity"],
+    "pubType": ["設立別", "公私立", "機構類型", "屬性", "type"],
+    "evaluation": ["評鑑結果", "查核結果", "評核結果", "evaluation", "result"],
+    "date": ["日期", "評鑑日期", "查核日期", "發文日期", "date"],
+}
+
+OCR_RULES = [
+    ("幼兒教育及照顧法第30條", ("超收", "核定人數", "師生比"), "人員與收托管理", 18),
+    ("幼兒教育及照顧法第33條", ("不當管教", "體罰", "不當對待"), "兒童安全與照顧", 28),
+    ("教保服務機構收退費辦法第6條", ("收費", "退費", "超收費用"), "收費與退費", 14),
+    ("教保服務機構評鑑辦法第8條", ("限期改善", "改善事項", "追蹤評鑑"), "評鑑改善追蹤", 12),
+    ("食品安全衛生管理法第8條", ("餐點", "廚房", "食品", "留樣"), "餐飲衛生", 16),
+]
+
+NEGATIVE_TERMS = {
+    "受傷": 24,
+    "體罰": 34,
+    "不當管教": 32,
+    "超收": 20,
+    "違規": 18,
+    "投訴": 12,
+    "爭議": 10,
+    "延誤": 8,
+    "疑似": 5,
+}
+
+
+def demo_schools() -> list[dict[str, Any]]:
+    """Return the stable synthetic school set used by the risk-engine API."""
+    names = [
+        "幸福", "晨光", "小橡樹", "向陽", "禾苗", "彩虹", "童心", "小星星", "蒲公英", "暖陽", "森林",
+        "青田", "小樹屋", "果實", "晴空", "樂田", "花鹿", "小太陽", "星河", "月芽", "藍天", "小海豚",
+    ]
+    districts = ["板橋區", "新莊區", "三重區", "中和區", "淡水區", "汐止區"]
+    return [
+        {
+            "id": index,
+            "name": f"{name}幼兒園",
+            "district": districts[index % len(districts)],
+            "address": f"新北市{districts[index % len(districts)]}示範路{18 + index * 7}號",
+            "complete": 34 + (index - 18) * 7 if index >= 18 else 91 - index % 7,
+            "capacity": 120 + index * 5,
+        }
+        for index, name in enumerate(names)
+    ]
+
+
+def normalize_label(value: Any) -> str:
+    """Return a comparison-safe label without logging the original value."""
+    label = re.sub(r"[^0-9a-z\u4e00-\u9fff]", "", str(value or "").strip().lower())
+    for source, target in {"全稱": "名稱", "所在": "", "核准": "核定", "容量": "人數", "聯繫": "聯絡"}.items():
+        label = label.replace(source, target)
+    return label
+
+
+def suggest_field_mapping(headers: list[Any]) -> list[dict[str, Any]]:
+    """Create explainable semantic field suggestions for uploaded headers."""
+    suggestions: list[dict[str, Any]] = []
+    for raw_header in headers[:100]:
+        header = str(raw_header or "").strip()[:120]
+        normalized = normalize_label(header)
+        best_field = ""
+        best_alias = ""
+        best_score = 0
+        for field, aliases in STANDARD_FIELDS.items():
+            for alias in aliases:
+                candidate = normalize_label(alias)
+                if not normalized or not candidate:
+                    score = 0
+                elif normalized == candidate:
+                    score = 99
+                elif normalized in candidate or candidate in normalized:
+                    score = 88
+                else:
+                    common = len(set(normalized) & set(candidate))
+                    score = round(common / max(len(set(candidate)), 1) * 64)
+                if score > best_score:
+                    best_field, best_alias, best_score = field, alias, score
+        suggestions.append(
+            {
+                "source": header,
+                "target": best_field if best_score >= 45 else "",
+                "confidence": best_score,
+                "reason": f"與「{best_alias}」語意接近" if best_field else "找不到可信的標準欄位，請人工確認",
+                "needsReview": best_score < 75,
+            }
+        )
+    return suggestions
+
+
+def analyze_ocr_text(text: Any, filename: Any = "") -> dict[str, Any]:
+    """Extract demo compliance findings from document text or filename."""
+    content = re.sub(r"\s+", " ", f"{filename} {text}").strip()[:100_000]
+    findings: list[dict[str, Any]] = []
+    for clause, keywords, category, impact in OCR_RULES:
+        hits = [keyword for keyword in keywords if keyword in content]
+        if hits:
+            findings.append(
+                {
+                    "category": category,
+                    "summary": f"文件提及「{'、'.join(hits[:3])}」，建議列入人工覆核。",
+                    "clause": clause,
+                    "riskImpact": impact,
+                    "evidence": f"關鍵詞：{'、'.join(hits[:3])}",
+                    "verified": False,
+                }
+            )
+    if not findings:
+        findings.append(
+            {
+                "category": "文件完整性",
+                "summary": "未在可讀文字中辨識明確缺失，請承辦人檢視原始頁面。",
+                "clause": "需人工判讀",
+                "riskImpact": 0,
+                "evidence": "Demo 模式未取得足夠文字",
+                "verified": False,
+            }
+        )
+    return {
+        "demo": True,
+        "provider": "Demo OCR + 規則檢核",
+        "document": str(filename or "未命名文件")[:180],
+        "findings": findings,
+        "notice": "本結果為 AI 輔助擷取，須由承辦人覆核後才能作為正式依據。",
+    }
+
+
+def _event_key(event: dict[str, Any]) -> str:
+    title = normalize_label(event.get("title"))[:50]
+    source = normalize_label(event.get("source"))[:30]
+    date = str(event.get("date") or "")[:10]
+    return hashlib.sha256(f"{title}|{source}|{date}".encode("utf-8")).hexdigest()[:16]
+
+
+def safe_public_url(value: Any) -> str:
+    try:
+        parsed = urllib.parse.urlparse(str(value or ""))
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))[:500]
+    except ValueError:
+        pass
+    return ""
+
+
+def deduplicate_sentiment(events: list[Any]) -> list[dict[str, Any]]:
+    """Deduplicate public clues and calculate explainable severity."""
+    unique: dict[str, dict[str, Any]] = {}
+    for raw in events[:200]:
+        if not isinstance(raw, dict):
+            continue
+        title = str(raw.get("title") or "未命名公開線索")[:240]
+        excerpt = str(raw.get("excerpt") or raw.get("summary") or "")[:1200]
+        score = min(100, 8 + sum(weight for term, weight in NEGATIVE_TERMS.items() if term in f"{title} {excerpt}"))
+        severity = "高" if score >= 55 else "中" if score >= 28 else "低"
+        event = {
+            "id": _event_key(raw),
+            "title": title,
+            "source": str(raw.get("source") or "公開網路")[:80],
+            "date": str(raw.get("date") or "")[:20],
+            "url": safe_public_url(raw.get("url")),
+            "excerpt": excerpt,
+            "negativeScore": score,
+            "severity": severity,
+            "label": "未經查證之公開線索",
+            "aiSummary": f"偵測到{severity}度負向訊號，建議與正式陳情或查核紀錄交叉比對。",
+        }
+        key = event["id"]
+        if key not in unique or event["negativeScore"] > unique[key]["negativeScore"]:
+            unique[key] = event
+    return sorted(unique.values(), key=lambda item: (item["date"], item["negativeScore"]), reverse=True)
+
+
+def mask_sensitive(value: Any) -> str:
+    """Mask common Taiwan PII patterns before display or logging."""
+    text = str(value or "")[:100_000]
+    text = re.sub(r"\b[A-Z][12]\d{8}\b", lambda m: m.group(0)[:2] + "******" + m.group(0)[-2:], text)
+    text = re.sub(r"(?<!\d)09\d{8}(?!\d)", lambda m: m.group(0)[:4] + "***" + m.group(0)[-3:], text)
+    text = re.sub(r"([\w.+-])([\w.+-]*)(@[^\s@]+)", lambda m: m.group(1) + "***" + m.group(3), text)
+    return text
+
+
+def _fallback_audit_advice(school_name: str, risk_score: int) -> dict[str, Any]:
+    return {
+        "summary": f"針對{school_name}的主要異常，優先核對人員配置與財務收費憑證。",
+        "priorityLevel": "高優先（建議 3 日內前往）" if risk_score >= 75 else "中優先（排入雙週查核）",
+        "suggestedActions": [
+            {
+                "title": "人員出勤與在職配置查核",
+                "reason": "裁罰紀錄或人員配置出現異常訊號",
+                "checklist": [
+                    "核對各班級教保服務人員簽到退紀錄",
+                    "抽查勞健保投保明細與薪資轉帳清冊",
+                    "實地清點師生比是否符合核定配置",
+                ],
+                "requiredDocuments": ["近三個月出勤紀錄簿", "勞健保及勞退提繳名冊", "主管機關核備人員名冊"],
+            },
+            {
+                "title": "財務收支與收費核實",
+                "reason": "人事成本或申報收入差額出現異常訊號",
+                "checklist": [
+                    "核對人事費科目的傳票與憑證",
+                    "比對收費收據與實際在園人數",
+                    "確認收費款項均進入機構帳戶並入帳",
+                ],
+                "requiredDocuments": ["年度總分類帳及傳票", "學雜費收據存根", "金融機構存款對帳單"],
+            },
+        ],
+        "complianceNotice": "系統分析僅供主管機關安排查核參考，仍須由承辦人確認，不作為直接裁罰依據。",
+    }
+
+
+def generate_bedrock_advice(payload: dict[str, Any]) -> dict[str, Any]:
+    """Use Bedrock when configured and keep a safe, usable local fallback."""
+    school_name = str(payload.get("schoolName") or "未知幼兒園")[:120]
+    district = str(payload.get("district") or "新北市轄區")[:60]
+    school_type = str(payload.get("type") or "私立")[:40]
+    try:
+        capacity = max(0, min(int(payload.get("capacity", 100)), 10_000))
+        risk_score = max(0, min(int(payload.get("riskScore", 75)), 100))
+    except (TypeError, ValueError):
+        capacity, risk_score = 100, 75
+    reasons = payload.get("riskReasons", [])
+    if not isinstance(reasons, list):
+        reasons = []
+    reason_lines = []
+    for reason in reasons[:10]:
+        if not isinstance(reason, dict):
+            continue
+        title = str(reason.get("title") or "")[:160]
+        summary = str(reason.get("summary") or "")[:500]
+        observation = str(reason.get("observation") or "")[:500]
+        reason_lines.append(f"- {title}: {summary} ({observation})")
+    reasons_text = "\n".join(reason_lines) or "整體資料待補或例行查核"
+
+    system_prompt = (
+        "你是熟悉台灣幼兒教育及照顧法規的主管機關稽核顧問。"
+        "請根據園所風險資料產出具體的現場查核清單與建議調閱表冊。"
+        "只輸出合法 JSON，欄位必須包含 summary、priorityLevel、suggestedActions、complianceNotice；"
+        "suggestedActions 每項包含 title、reason、checklist、requiredDocuments。"
+    )
+    user_prompt = (
+        f"園所：{school_name}\n轄區：{district}\n類型：{school_type}\n"
+        f"核定招生：{capacity} 人\n風險分數：{risk_score}\n異常原因：\n{reasons_text}"
+    )
+    region = os.environ.get("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "us-west-2"))
+    primary_model = os.environ.get("BEDROCK_MODEL_ID", "us.amazon.nova-pro-v1:0")
+    fallback_model = os.environ.get("BEDROCK_FALLBACK_MODEL_ID", "us.amazon.nova-lite-v1:0")
+    model_used = primary_model
+    advice = None
+    provider = "local-fallback"
+    try:
+        import boto3
+
+        client = boto3.client("bedrock-runtime", region_name=region)
+        response = None
+        for model_id, max_tokens in ((primary_model, 1800), (fallback_model, 1500)):
+            try:
+                response = client.converse(
+                    modelId=model_id,
+                    system=[{"text": system_prompt}],
+                    messages=[{"role": "user", "content": [{"text": user_prompt}]}],
+                    inferenceConfig={"temperature": 0.1, "maxTokens": max_tokens},
+                )
+                model_used = model_id
+                break
+            except Exception:
+                response = None
+        if response:
+            raw_text = response["output"]["message"]["content"][0]["text"]
+            clean_text = raw_text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            candidate = json.loads(clean_text)
+            if isinstance(candidate, dict) and isinstance(candidate.get("suggestedActions"), list):
+                advice = candidate
+                provider = "aws-bedrock"
+    except Exception:
+        advice = None
+    if advice is None:
+        advice = _fallback_audit_advice(school_name, risk_score)
+    return {
+        "status": "success",
+        "model": model_used,
+        "provider": provider,
+        "schoolId": payload.get("schoolId"),
+        "advice": advice,
+    }
+
+
+class _RateLimiter:
+    def __init__(self, limit: int = 60, window_seconds: int = 60):
+        self.limit = limit
+        self.window_seconds = window_seconds
+        self._events: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def allow(self, key: str) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            bucket = self._events[key]
+            while bucket and now - bucket[0] > self.window_seconds:
+                bucket.popleft()
+            if len(bucket) >= self.limit:
+                return False
+            bucket.append(now)
+            return True
+
+
+RATE_LIMITER = _RateLimiter()
+
 
 class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
-    def end_headers(self):
-        # 允許跨來源與關閉快取
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD')
-        self.send_header('Access-Control-Allow-Headers', '*')
-        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+    server_version = "YouanRadar/1.0"
+    sys_version = ""
+
+    def log_message(self, fmt: str, *args: Any) -> None:
+        # Do not log query strings or request bodies; they can contain PII.
+        clean_path = urllib.parse.urlparse(self.path).path
+        print(f"{self.address_string()} [{self.log_date_time_string()}] {self.command} {clean_path}")
+
+    def end_headers(self) -> None:
+        origin = self.headers.get("Origin", "")
+        if origin in ALLOWED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' blob:; "
+            "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; "
+            "worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        )
         super().end_headers()
 
-    def do_OPTIONS(self):
-        self.send_response(200)
+    def _json(self, status: int, payload: Any) -> None:
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _read_json(self) -> dict[str, Any] | None:
+        try:
+            size = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            self._json(400, {"status": "error", "message": "Content-Length 格式錯誤"})
+            return None
+        if size < 0 or size > MAX_BODY_BYTES:
+            self._json(413, {"status": "error", "message": "請求內容超過 2 MB 上限"})
+            return None
+        try:
+            data = json.loads(self.rfile.read(size).decode("utf-8")) if size else {}
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self._json(400, {"status": "error", "message": "JSON 格式錯誤"})
+            return None
+        if not isinstance(data, dict):
+            self._json(400, {"status": "error", "message": "JSON 最外層必須是物件"})
+            return None
+        return data
+
+    def _allow_request(self) -> bool:
+        key = self.client_address[0] if self.client_address else "unknown"
+        if RATE_LIMITER.allow(key):
+            return True
+        self._json(429, {"status": "error", "message": "請求過於頻繁，請稍後再試"})
+        return False
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
-    def do_HEAD(self):
-        parsed = urllib.parse.urlparse(self.path)
-        if parsed.path.startswith("/api/"):
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.end_headers()
+    def do_HEAD(self) -> None:
+        if urllib.parse.urlparse(self.path).path.startswith("/api/"):
+            self._json(200, {"status": "ok"})
             return
-        return super().do_HEAD()
+        super().do_HEAD()
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
-        query = urllib.parse.parse_qs(parsed.query)
-
-        # 1. API: 取得真實教育部幼兒園資料庫
+        if path.startswith("/api/") and not self._allow_request():
+            return
+        if path == "/api/health":
+            self._json(200, {"status": "ok", "service": "幼安雷達 Demo API"})
+            return
+        if path == "/api/security/status":
+            self._json(
+                200,
+                {
+                    "status": "ok",
+                    "controls": ["同源 API", "2 MB 請求上限", "敏感資料遮罩", "安全回應標頭", "重新整理重設 Demo 狀態"],
+                    "artifactStorage": "private-s3-sse-s3",
+                    "credentialMode": "environment-or-instance-role",
+                },
+            )
+            return
         if path == "/api/schools":
-            mode = query.get("mode", ["real"])[0]
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.end_headers()
-            
-            if mode == "real":
-                base_dir = os.path.dirname(os.path.abspath(__file__))
-                data_file = os.path.join(base_dir, "data", "real_schools.json")
-                if os.path.exists(data_file):
-                    with open(data_file, "r", encoding="utf-8") as f:
-                        self.wfile.write(f.read().encode("utf-8"))
+            mode = urllib.parse.parse_qs(parsed.query).get("mode", ["real"])[0]
+            if mode != "real":
+                self._json(200, {"status": "use_demo"})
+                return
+            file_path = BASE_DIR / "data" / "real_schools.json"
+            try:
+                data = json.loads(file_path.read_text(encoding="utf-8")) if file_path.exists() else []
+                self._json(200, data)
+            except (OSError, json.JSONDecodeError):
+                self._json(500, {"status": "error", "message": "資料檔暫時無法讀取"})
+            return
+        if path == "/api/insights":
+            file_path = BASE_DIR / "data" / "moe_insights.json"
+            try:
+                if not file_path.exists():
+                    self._json(404, {"status": "error", "message": "Insights 尚未產生"})
                 else:
-                    self.wfile.write(json.dumps([]).encode("utf-8"))
-            else:
-                # 回傳簡報模擬資料 (從 data.js 概念中取用)
-                self.wfile.write(json.dumps({"status": "use_demo"}).encode("utf-8"))
+                    self._json(200, json.loads(file_path.read_text(encoding="utf-8")))
+            except (OSError, json.JSONDecodeError):
+                self._json(500, {"status": "error", "message": "Insights 暫時無法讀取"})
             return
-
-        # 2. API: 取得教育部大數據 Insight 報告
-        elif path == "/api/insights":
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.end_headers()
-            
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            insights_file = os.path.join(base_dir, "data", "moe_insights.json")
-            if os.path.exists(insights_file):
-                with open(insights_file, "r", encoding="utf-8") as f:
-                    self.wfile.write(f.read().encode("utf-8"))
-            else:
-                self.wfile.write(json.dumps({"error": "Insights not yet generated"}).encode("utf-8"))
-            return
-
-        # 3. API: 取得持久化儲存狀態 (支援 AWS RDS PostgreSQL / SQLite)
-        elif path == "/api/storage/state":
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.end_headers()
-            state_info = get_state()
-            self.wfile.write(json.dumps({
-                "status": "success",
-                "exists": state_info["exists"],
-                "data": state_info["data"],
-                "backend": state_info.get("backend"),
-                "updatedAt": state_info.get("updated_at")
-            }, ensure_ascii=False).encode('utf-8'))
-            return
-
-        # 4. API: 取得持久化資料庫統計與後端連線資訊
-        elif path == "/api/storage/stats":
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.end_headers()
-            stats = get_stats()
-            self.wfile.write(json.dumps({
-                "status": "success",
-                "stats": stats
-            }, ensure_ascii=False).encode('utf-8'))
-            return
-
-        # 5. API: 動態四構面風險計算園所清單
-        elif path == "/api/risk/schools":
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.end_headers()
-            
-            state_info = get_state()
-            state_data = state_info.get("data") or {}
-            current_rules = state_data.get("rules", DEFAULT_RULES)
-            current_thresholds = state_data.get("thresholds", DEFAULT_THRESHOLDS)
-
-            names = ['幸福','晨光','小橡樹','向陽','禾苗','彩虹','童心','小星星','蒲公英','暖陽','森林','青田','小樹屋','果實','晴空','樂田','花鹿','小太陽','星河','月芽','藍天','小海豚']
-            districts = ['板橋區','新莊區','三重區','中和區','淡水區','汐止區']
-            raw_schools = [{
-                "id": i,
-                "name": f"{n}幼兒園",
-                "district": districts[i % 6],
-                "address": f"新北市{districts[i % 6]}示範路{18 + i * 7}號",
-                "complete": 34 + (i - 18) * 7 if i >= 18 else (91 - i % 7),
-                "capacity": 120 + i * 5
-            } for i, n in enumerate(names)]
-
-            result = recalculate_all_schools(raw_schools, current_rules, current_thresholds)
-            self.wfile.write(json.dumps({
-                "status": "success",
-                "count": len(result["schools"]),
-                "stats": result["stats"],
-                "schools": result["schools"],
-                "rules": result["rulesUsed"],
-                "thresholds": result["thresholdsUsed"]
-            }, ensure_ascii=False).encode('utf-8'))
-            return
-
-        # 6. API: 取得當前風險規則與門檻設定
-        elif path == "/api/risk/rules":
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.end_headers()
-            state_info = get_state()
-            state_data = state_info.get("data") or {}
-            self.wfile.write(json.dumps({
-                "status": "success",
-                "rules": state_data.get("rules", DEFAULT_RULES),
-                "thresholds": state_data.get("thresholds", DEFAULT_THRESHOLDS)
-            }, ensure_ascii=False).encode('utf-8'))
-            return
-
-        # 預設靜態檔案服務 (HTML, CSS, JS)
-        return super().do_GET()
-
-    def do_POST(self):
-        parsed = urllib.parse.urlparse(self.path)
-        
-        # 3. API: 即時向教育部全國教保資訊網觸發爬蟲 (Live On-Demand Crawl)
-        if parsed.path == "/api/crawl-live":
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_body = self.rfile.read(content_length).decode('utf-8')
+        if path == "/api/storage/state":
             try:
-                payload = json.loads(post_body) if post_body else {}
-                district_code = payload.get("districtCode", "220") # 預設板橋
-                district_name = payload.get("districtName", "板橋區")
-                max_pages = int(payload.get("pages", 1))
-
-                opener = create_session()
-                raw_cards = fetch_district_schools(opener, district_code, district_name, max_pages=max_pages)
-                enriched = enrich_risk_metrics(raw_cards)
-                
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({
-                    "status": "success",
-                    "count": len(enriched),
-                    "district": district_name,
-                    "data": enriched
-                }, ensure_ascii=False).encode('utf-8'))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
-            return
-
-        # 4. API: 透過 AWS Bedrock (Amazon Nova Pro / Lite) 生成客製化查核建議與調閱公文清單
-        elif parsed.path == "/api/bedrock/audit-advice":
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_body = self.rfile.read(content_length).decode('utf-8')
-            try:
-                payload = json.loads(post_body) if post_body else {}
-                school_name = payload.get("schoolName", "未知幼兒園")
-                district = payload.get("district", "新北市轄區")
-                school_type = payload.get("type", "私立")
-                capacity = payload.get("capacity", 100)
-                risk_score = payload.get("riskScore", 75)
-                reasons = payload.get("riskReasons", [])
-                
-                reasons_text = "\n".join([f"- {r.get('title', '')}: {r.get('summary', '')} ({r.get('observation', '')})" for r in reasons]) or "整體資料待補或例行查核"
-                
-                system_prompt = (
-                    "你是一位精通台灣教育部法規（幼兒教育及照顧法、教保服務人員條例）的專業教保機構稽查專家與主管機關稽核顧問。"
-                    "你的任務是根據主管機關提供的幼兒園風險指標、裁罰歷史與財務異常差額，"
-                    "為外勤稽查人員生成針對該園所異常原因的【現場查核 Checklist】以及【現場建議調閱之公文與表冊清單】。"
-                    "請以繁體中文輸出，並嚴格只返回合法 JSON，格式結構如下：\n"
-                    "{\n"
-                    '  "summary": "一句話總結本次查核核心重點",\n'
-                    '  "priorityLevel": "高優先 (建議 3 日內前往)" / "中優先 (排入雙週查核)" / "例行輔導",\n'
-                    '  "suggestedActions": [\n'
-                    "    {\n"
-                    '      "title": "行動標題",\n'
-                    '      "reason": "對應之風險原因",\n'
-                    '      "checklist": [\n'
-                    '        "現場查核具體項目 1",\n'
-                    '        "現場查核具體項目 2"\n'
-                    "      ],\n"
-                    '      "requiredDocuments": [\n'
-                    '        "建議現場調閱表冊 1",\n'
-                    '        "建議現場調閱表冊 2"\n'
-                    "      ]\n"
-                    "    }\n"
-                    "  ],\n"
-                    '  "complianceNotice": "本查核建議由 AWS Bedrock (Amazon Nova) 根據申報指標動態生成，僅供主管機關派員查核參考，不作為直接裁罰依據。"\n'
-                    "}"
+                state = get_state()
+                self._json(
+                    200,
+                    {
+                        "status": "success",
+                        "exists": state["exists"],
+                        "data": state["data"],
+                        "backend": state.get("backend"),
+                        "updatedAt": state.get("updated_at"),
+                    },
                 )
-                
-                user_prompt = (
-                    f"幼兒園名稱：{school_name}\n"
-                    f"轄區：{district}（{school_type}，核定招生：{capacity} 人）\n"
-                    f"綜合風險分數：{risk_score} 分\n"
-                    f"主要異常原因與事由：\n{reasons_text}\n\n"
-                    f"請生成具備高度行政可操作性的現場查核指引 JSON。"
-                )
-                
-                advice_data = None
-                aws_region = os.environ.get("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "us-west-2"))
-                primary_model = os.environ.get("BEDROCK_MODEL_ID", "us.amazon.nova-pro-v1:0")
-                fallback_model = os.environ.get("BEDROCK_FALLBACK_MODEL_ID", "us.amazon.nova-lite-v1:0")
-                model_used = primary_model
-
-                try:
-                    import boto3
-                    client = boto3.client('bedrock-runtime', region_name=aws_region)
-                    try:
-                        resp = client.converse(
-                            modelId=primary_model,
-                            system=[{'text': system_prompt}],
-                            messages=[{'role': 'user', 'content': [{'text': user_prompt}]}],
-                            inferenceConfig={'temperature': 0.1, 'maxTokens': 1800}
-                        )
-                    except Exception as model_err:
-                        model_used = fallback_model
-                        resp = client.converse(
-                            modelId=fallback_model,
-                            system=[{'text': system_prompt}],
-                            messages=[{'role': 'user', 'content': [{'text': user_prompt}]}],
-                            inferenceConfig={'temperature': 0.1, 'maxTokens': 1500}
-                        )
-                    raw_text = resp['output']['message']['content'][0]['text']
-                    clean_text = raw_text.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
-                    advice_data = json.loads(clean_text)
-                except Exception as b_err:
-                    print(f"Bedrock invocation fallback: {b_err}")
-                    advice_data = {
-                        "summary": f"針對{school_name}主要異常事項，優先查核人員配置真實性與相關財務收費憑證。",
-                        "priorityLevel": "高優先 (建議 3 日內前往)" if risk_score >= 75 else "中優先 (排入雙週查核)",
-                        "suggestedActions": [
-                            {
-                                "title": "人員出勤與在職配置合規查核",
-                                "reason": "近一年裁罰或人員配置異常紀錄",
-                                "checklist": [
-                                    "核對各班級每日教保服務人員簽到退紀錄",
-                                    "抽查教保服務人員勞健保投保明細與薪資轉帳清冊",
-                                    "實地清點現場師生比是否符合法定配置標準"
-                                ],
-                                "requiredDocuments": [
-                                    "教職員工出勤紀錄簿（前三個月）",
-                                    "勞保、健保及勞退提繳名冊",
-                                    "主管機關核備之教職員工名冊"
-                                ]
-                            },
-                            {
-                                "title": "財務收支與人事費支出核實",
-                                "reason": "每生人事成本偏高或申報收入差額異常",
-                                "checklist": [
-                                    "核對年度總分類帳中人事費用科目之各項傳票憑證",
-                                    "比對收費收據存根聯與實際招生入園人數",
-                                    "查核是否有以個人帳戶收取學費或未入帳情事"
-                                ],
-                                "requiredDocuments": [
-                                    "年度總分類帳及各月份傳票",
-                                    "學雜費收費收據存根聯",
-                                    "金融機構存款對帳單"
-                                ]
-                            }
-                        ],
-                        "complianceNotice": "本查核建議由系統專家規則與 AWS Bedrock 引擎輔助生成，供主管機關派員查核參考。"
-                    }
-                
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({
-                    "status": "success",
-                    "model": model_used,
-                    "schoolId": payload.get("schoolId"),
-                    "advice": advice_data
-                }, ensure_ascii=False).encode('utf-8'))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+            except Exception:
+                self._json(500, {"status": "error", "message": "儲存狀態暫時無法讀取"})
             return
-
-        # 5. API: 將狀態存入持久化資料庫 (AWS RDS / SQLite)
-        elif parsed.path == "/api/storage/save":
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_body = self.rfile.read(content_length).decode('utf-8')
+        if path == "/api/storage/stats":
             try:
-                payload = json.loads(post_body) if post_body else {}
-                incoming = payload.get("db", payload)
-                current_state = get_state()
-                current_data = current_state.get("data") or {}
-                if isinstance(current_data, dict) and isinstance(incoming, dict):
-                    merged_data = dict(current_data)
-                    merged_data.update(incoming)
-                    if "reviews" in current_data and "reviews" in incoming and isinstance(current_data["reviews"], dict) and isinstance(incoming["reviews"], dict):
-                        merged_reviews = dict(current_data["reviews"])
-                        merged_reviews.update(incoming["reviews"])
-                        merged_data["reviews"] = merged_reviews
-                    db_data = merged_data
-                else:
-                    db_data = incoming
-                save_state(db_data)
-                stats = get_stats()
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({
-                    "status": "success",
-                    "backend": stats.get("backend"),
-                    "message": f"State successfully persisted to {stats.get('backend')}"
-                }, ensure_ascii=False).encode('utf-8'))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                self._json(200, {"status": "success", "stats": get_stats()})
+            except Exception:
+                self._json(500, {"status": "error", "message": "儲存統計暫時無法讀取"})
             return
+        if path in {"/api/risk/schools", "/api/risk/rules"}:
+            try:
+                state = get_state()
+                state_data = state.get("data") or {}
+                rules = state_data.get("rules", DEFAULT_RULES)
+                thresholds = state_data.get("thresholds", DEFAULT_THRESHOLDS)
+                if path == "/api/risk/rules":
+                    self._json(200, {"status": "success", "rules": rules, "thresholds": thresholds})
+                    return
+                result = recalculate_all_schools(demo_schools(), rules, thresholds)
+                self._json(
+                    200,
+                    {
+                        "status": "success",
+                        "count": len(result["schools"]),
+                        "stats": result["stats"],
+                        "schools": result["schools"],
+                        "rules": result["rulesUsed"],
+                        "thresholds": result["thresholdsUsed"],
+                    },
+                )
+            except Exception:
+                self._json(500, {"status": "error", "message": "風險評分資料暫時無法讀取"})
+            return
+        super().do_GET()
 
-        # 6. API: 重設資料庫為初始示範狀態
-        elif parsed.path == "/api/storage/reset":
+    def do_POST(self) -> None:
+        path = urllib.parse.urlparse(self.path).path
+        if not self._allow_request():
+            return
+        payload = self._read_json()
+        if payload is None:
+            return
+        if path == "/api/ai/field-map":
+            headers = payload.get("headers", [])
+            if not isinstance(headers, list):
+                self._json(400, {"status": "error", "message": "headers 必須是陣列"})
+                return
+            self._json(200, {"demo": True, "provider": "Demo Semantic Mapper", "suggestions": suggest_field_mapping(headers)})
+            return
+        if path == "/api/ai/ocr-check":
+            self._json(200, analyze_ocr_text(payload.get("text", ""), payload.get("filename", "")))
+            return
+        if path == "/api/ai/sentiment":
+            events = payload.get("events", [])
+            if not isinstance(events, list):
+                self._json(400, {"status": "error", "message": "events 必須是陣列"})
+                return
+            self._json(
+                200,
+                {
+                    "demo": True,
+                    "provider": "Demo Sentiment Analyzer",
+                    "events": deduplicate_sentiment(events),
+                    "notice": "未經查證之公開線索，僅供決定是否進一步查核。",
+                },
+            )
+            return
+        if path == "/api/security/mask":
+            self._json(200, {"masked": mask_sensitive(payload.get("text", ""))})
+            return
+        if path == "/api/bedrock/audit-advice":
+            self._json(200, generate_bedrock_advice(payload))
+            return
+        if path == "/api/crawl-live":
+            try:
+                district_code = str(payload.get("districtCode", "220"))[:10]
+                district_name = str(payload.get("districtName", "板橋區"))[:30]
+                max_pages = max(1, min(int(payload.get("pages", 1)), 3))
+                cards = fetch_district_schools(create_session(), district_code, district_name, max_pages=max_pages)
+                enriched = enrich_risk_metrics(cards)
+                self._json(200, {"status": "success", "count": len(enriched), "district": district_name, "data": enriched})
+            except (OSError, ValueError, TimeoutError):
+                self._json(502, {"status": "error", "message": "教育部資料來源暫時無法連線"})
+            return
+        if path == "/api/storage/save":
+            incoming = payload.get("db", payload)
+            if not isinstance(incoming, dict):
+                self._json(400, {"status": "error", "message": "db 必須是物件"})
+                return
+            try:
+                current = get_state().get("data") or {}
+                state = {**current, **incoming} if isinstance(current, dict) else incoming
+                if isinstance(current, dict) and isinstance(current.get("reviews"), dict) and isinstance(incoming.get("reviews"), dict):
+                    state["reviews"] = {**current["reviews"], **incoming["reviews"]}
+                save_state(state)
+                backend = get_stats().get("backend", "database")
+                self._json(200, {"status": "success", "backend": backend, "message": f"狀態已儲存至 {backend}"})
+            except Exception:
+                self._json(500, {"status": "error", "message": "狀態暫時無法儲存"})
+            return
+        if path == "/api/storage/reset":
             try:
                 reset_db()
-                stats = get_stats()
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({
-                    "status": "success",
-                    "backend": stats.get("backend"),
-                    "message": f"Database ({stats.get('backend')}) successfully reset to initial clean state"
-                }, ensure_ascii=False).encode('utf-8'))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                backend = get_stats().get("backend", "database")
+                self._json(200, {"status": "success", "backend": backend, "message": f"{backend} Demo 狀態已清除"})
+            except Exception:
+                self._json(500, {"status": "error", "message": "Demo 狀態暫時無法重設"})
             return
-
-        # 7. API: 手動將 SQLite 資料遷移至 AWS RDS PostgreSQL
-        elif parsed.path == "/api/storage/migrate":
+        if path == "/api/risk/recalculate":
+            rules = payload.get("rules", DEFAULT_RULES)
+            thresholds = payload.get("thresholds", DEFAULT_THRESHOLDS)
+            if not isinstance(rules, list) or not isinstance(thresholds, list):
+                self._json(400, {"status": "error", "message": "rules 與 thresholds 格式錯誤"})
+                return
             try:
-                ok = migrate_sqlite_to_rds()
-                stats = get_stats()
-                self.send_response(200 if ok else 500)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({
-                    "status": "success" if ok else "error",
-                    "stats": stats,
-                    "message": "SQLite 資料已全數遷移至 AWS RDS PostgreSQL" if ok else "資料遷移失敗"
-                }, ensure_ascii=False).encode('utf-8'))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                result = recalculate_all_schools(demo_schools(), rules, thresholds)
+                self._json(
+                    200,
+                    {
+                        "status": "success",
+                        "stats": result["stats"],
+                        "schools": result["schools"],
+                        "rules": result["rulesUsed"],
+                        "thresholds": result["thresholdsUsed"],
+                        "persisted": False,
+                        "message": "已完成本次 Demo 計算；結果未寫入共享資料庫",
+                    },
+                )
+            except (TypeError, ValueError):
+                self._json(400, {"status": "error", "message": "風險規則或門檻內容無法計算"})
             return
+        self._json(404, {"status": "error", "message": "找不到 API 端點"})
 
-        # 8. API: 接收自訂規則或門檻，動態重新計算所有園所風險並同步保存
-        elif parsed.path == "/api/risk/recalculate":
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_body = self.rfile.read(content_length).decode('utf-8')
-            try:
-                payload = json.loads(post_body) if post_body else {}
-                custom_rules = payload.get("rules")
-                custom_thresholds = payload.get("thresholds")
-
-                state_info = get_state()
-                db_data = state_info.get("data") or {}
-                if custom_rules:
-                    db_data["rules"] = custom_rules
-                if custom_thresholds:
-                    db_data["thresholds"] = custom_thresholds
-                
-                # 持久化更新至資料庫 (AWS RDS / SQLite)
-                save_state(db_data)
-                stats = get_stats()
-
-                # 準備示範園所資料
-                names = ['幸福','晨光','小橡樹','向陽','禾苗','彩虹','童心','小星星','蒲公英','暖陽','森林','青田','小樹屋','果實','晴空','樂田','花鹿','小太陽','星河','月芽','藍天','小海豚']
-                districts = ['板橋區','新莊區','三重區','中和區','淡水區','汐止區']
-                raw_schools = [{
-                    "id": i,
-                    "name": f"{n}幼兒園",
-                    "district": districts[i % 6],
-                    "address": f"新北市{districts[i % 6]}示範路{18 + i * 7}號",
-                    "complete": 34 + (i - 18) * 7 if i >= 18 else (91 - i % 7),
-                    "capacity": 120 + i * 5
-                } for i, n in enumerate(names)]
-
-                result = recalculate_all_schools(raw_schools, db_data.get("rules", DEFAULT_RULES), db_data.get("thresholds", DEFAULT_THRESHOLDS))
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({
-                    "status": "success",
-                    "stats": result["stats"],
-                    "schools": result["schools"],
-                    "rules": result["rulesUsed"],
-                    "thresholds": result["thresholdsUsed"],
-                    "backend": stats.get("backend"),
-                    "message": f"園所風險分數與 4 構面已動態重新計算並儲存至 {stats.get('backend')}"
-                }, ensure_ascii=False).encode('utf-8'))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-            return
-
-        self.send_response(404)
-        self.end_headers()
 
 class ThreadingServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-def run_server():
-    with ThreadingServer(("", PORT), RadarAPIHandler) as httpd:
-        print(f"📡 幼安雷達後端伺服器 (多執行緒版) 運行於 http://localhost:{PORT}")
+
+def run_server() -> None:
+    os.chdir(BASE_DIR)
+    with ThreadingServer(("", PORT), RadarAPIHandler) as server:
+        print(f"📡 幼安雷達 Demo API：http://127.0.0.1:{PORT}/preview.html")
         try:
-            httpd.serve_forever()
+            server.serve_forever()
         except KeyboardInterrupt:
             pass
+
 
 if __name__ == "__main__":
     run_server()
