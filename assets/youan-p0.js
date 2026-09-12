@@ -75,6 +75,7 @@
       }
     }
     // Preserve previously confirmed imports and their provenance; conflicting values remain reviewable.
+    db.schoolData = db.schoolData || {};
     for(const [id,d]of Object.entries(db.schoolData))for(const [k,v]of Object.entries(d.values||{})){
       if(['name','district','address','type','schoolId','year'].includes(k)||v==='')continue;
       addObservation(id,String(d.values.year||'2025'),k,numericImportFields.includes(k)?Number(v):v,d.file||'既有匯入','既有確認資料',`${label(k)}：${v}`,d.at||now());
@@ -438,7 +439,8 @@
   function activeTotal(rules){return round(rules.filter(r=>r.enabled).reduce((n,r)=>n+Number(r.weight||0),0));}
   async function syncRiskRecalculate(){
     try {
-      await fetch('/api/risk/recalculate', {
+      const apiBase = window.API_BASE || (window.location.hostname.includes('s3') || window.location.hostname.includes('amazonaws.com') || window.location.protocol === 'file:' ? 'http://54.191.62.21' : '');
+      await fetch(apiBase + '/api/risk/recalculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rules: db.rules, thresholds: db.thresholds })
