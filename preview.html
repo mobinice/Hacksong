@@ -39,11 +39,14 @@ async function syncFromStorage(){
       const data=await res.json();
       if(data.backend)dbBackend=data.backend;
       if(data.status==='success'&&data.exists&&data.data){
-        db=data.data;
-        if(!db.rules || !db.rules.some(r=>r.id==='eval') || db.rules.length<6){
+        db=Object.assign(structuredClone(initial), data.data);
+        if(!Array.isArray(db.fields) || db.fields.length === 0) db.fields = structuredClone(initial.fields);
+        if(!Array.isArray(db.rules) || !db.rules.some(r=>r.id==='eval') || db.rules.length<6){
           db.rules = structuredClone(initial.rules);
           persist();
         }
+        if(!Array.isArray(db.sources) || db.sources.length === 0) db.sources = structuredClone(initial.sources);
+        if(!Array.isArray(db.thresholds) || db.thresholds.length < 3) db.thresholds = [40, 60, 75];
         try{localStorage.setItem('youan-demo-v2',JSON.stringify(db));}catch{}
         if(window.Y&&typeof window.Y.refreshWork==='function')window.Y.refreshWork();
         if(typeof recalc==='function')recalc('從資料庫載入');

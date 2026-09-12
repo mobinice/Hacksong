@@ -348,7 +348,19 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
             post_body = self.rfile.read(content_length).decode('utf-8')
             try:
                 payload = json.loads(post_body) if post_body else {}
-                db_data = payload.get("db", payload)
+                incoming = payload.get("db", payload)
+                current_state = get_state()
+                current_data = current_state.get("data") or {}
+                if isinstance(current_data, dict) and isinstance(incoming, dict):
+                    merged_data = dict(current_data)
+                    merged_data.update(incoming)
+                    if "reviews" in current_data and "reviews" in incoming and isinstance(current_data["reviews"], dict) and isinstance(incoming["reviews"], dict):
+                        merged_reviews = dict(current_data["reviews"])
+                        merged_reviews.update(incoming["reviews"])
+                        merged_data["reviews"] = merged_reviews
+                    db_data = merged_data
+                else:
+                    db_data = incoming
                 save_state(db_data)
                 stats = get_stats()
                 self.send_response(200)
