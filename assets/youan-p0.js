@@ -169,7 +169,7 @@
   Y.saveRule=(e,i)=>{e.preventDefault();const v=Object.fromEntries(new FormData(e.target));Object.assign(draftRules[i],{name:v.name.trim(),dimension:v.dimension,threshold:draftRules[i].id==='repeat'?1:Number(v.threshold),weight:Number(v.weight)});closeModal();settings();};
   toggleRule=i=>{draftRules ||=clone(db.rules);draftRules[i].enabled=!draftRules[i].enabled;settings();};
   const previousSettings=settings;
-  settings=()=>{previousSettings();document.querySelectorAll('.tabs button').forEach(b=>{if(b.textContent==='資料欄位')b.textContent='欄位管理';});if(tab==='rules')Y.updateTotal();const note=$('#page>.note');if(note)note.textContent='資料僅保存於此瀏覽器。匯入確認、來源確認或發布規則後會重新計算；檔案不會上傳 AWS。';};
+  settings=()=>{previousSettings();document.querySelectorAll('.tabs button').forEach(b=>{if(b.textContent==='資料欄位')b.textContent='欄位管理';});if(tab==='rules')Y.updateTotal();const note=$('#page>.note');if(note)note.textContent='資料已即時同步保存於瀏覽器與後端 SQLite 資料庫。匯入確認、來源確認或發布規則後會重新計算；若需清空可點選「重設為初始示範資料」。';};
   const oldThreshold=saveThresholds;
   saveThresholds=e=>{oldThreshold(e);recalc('調整風險門檻');persist();};
   const nav=document.createElement('button');nav.id='nav-data';nav.textContent='▤　園所資料工作台';nav.onclick=()=>go('data');$('nav').prepend(nav);

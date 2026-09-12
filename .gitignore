@@ -26,6 +26,11 @@ test-results/
 output/
 *.log
 
+# Database runtime files
+*.db
+*.sqlite
+*.sqlite3
+
 # Editor / OS / Office temporary files
 .vscode/
 .idea/

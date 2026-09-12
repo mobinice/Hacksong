@@ -32,6 +32,10 @@ def load_dotenv(path=None):
 load_dotenv()
 
 from scripts.crawl_moe import create_session, fetch_district_schools, enrich_risk_metrics, generate_insights
+from scripts.storage_db import init_db, save_state, get_state, reset_db, get_stats
+
+# 初始化 SQLite 本地持久化資料庫
+init_db()
 
 PORT = int(os.environ.get("PORT", 8088))
 
@@ -89,6 +93,32 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(f.read().encode("utf-8"))
             else:
                 self.wfile.write(json.dumps({"error": "Insights not yet generated"}).encode("utf-8"))
+            return
+
+        # 3. API: 取得 SQLite 持久化儲存狀態
+        elif path == "/api/storage/state":
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            state_info = get_state()
+            self.wfile.write(json.dumps({
+                "status": "success",
+                "exists": state_info["exists"],
+                "data": state_info["data"],
+                "updatedAt": state_info.get("updated_at")
+            }, ensure_ascii=False).encode('utf-8'))
+            return
+
+        # 4. API: 取得 SQLite 持久化資料庫統計
+        elif path == "/api/storage/stats":
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            stats = get_stats()
+            self.wfile.write(json.dumps({
+                "status": "success",
+                "stats": stats
+            }, ensure_ascii=False).encode('utf-8'))
             return
 
         # 預設靜態檔案服務 (HTML, CSS, JS)
@@ -250,6 +280,46 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                     "schoolId": payload.get("schoolId"),
                     "advice": advice_data
                 }, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+            return
+
+        # 5. API: 將狀態存入 SQLite 持久化資料庫
+        elif parsed.path == "/api/storage/save":
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_body = self.rfile.read(content_length).decode('utf-8')
+            try:
+                payload = json.loads(post_body) if post_body else {}
+                db_data = payload.get("db", payload)
+                save_state(db_data)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "success",
+                    "message": "State successfully persisted to SQLite database"
+                }).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+            return
+
+        # 6. API: 重設 SQLite 資料庫為初始示範狀態
+        elif parsed.path == "/api/storage/reset":
+            try:
+                reset_db()
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "success",
+                    "message": "Database successfully reset to initial clean state"
+                }).encode('utf-8'))
             except Exception as e:
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
