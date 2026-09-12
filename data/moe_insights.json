@@ -1,39 +1,56 @@
 {
   "summary": {
-    "totalInstitutions": 110,
-    "evaluatedInstitutions": 108,
-    "unevaluatedInstitutions": 2,
-    "passRate": 99.1,
-    "issueRate": 12.0
+    "totalInstitutions": 1122,
+    "evaluatedInstitutions": 1077,
+    "institutionsWithoutPublishedHistory": 45
   },
-  "breakdown": {
-    "allIndicatorsPassed": 107,
-    "partialIndicatorsPassed": 7,
-    "followupEvaluationNeeded": 6,
-    "noEvaluationRecorded": 2,
-    "publicCount": 97,
-    "privateCount": 13,
-    "nonprofitCount": 0
-  },
-  "keyFindings": [
-    {
-      "title": "私立機構評鑑缺失風險比率顯著較高",
-      "desc": "在已受評的私立幼兒園中，有缺失或需追蹤評鑑的比例達 7.7%，相比公立幼兒園的 6.2% 高出許多，建議外勤有限人力應優先配置於私立大型機構。"
-    },
-    {
-      "title": "「尚未接受評鑑」機構構成實質監控盲區",
-      "desc": "本次轄區清查發現有 2 間園所教育部資料庫標記「尚未接受評鑑」。若系統僅以『無違規』視同『低風險』，將導致新設園所長期處於監管真空。幼安雷達自動將其歸類為【資料不足待補件】，有效杜絕稽查死角。"
-    },
-    {
-      "title": "評鑑結果與學童規模加權效應",
-      "desc": "部分指標通過之機構平均核定人數達 145 人以上，單一園所之環境或師生比缺失可能影響百名幼童家庭，AI 風險引擎已針對規模進行加權提升查核優先序。"
-    }
-  ],
   "districts": {
-    "板橋區": 30,
-    "三重區": 20,
-    "中和區": 20,
-    "新莊區": 20,
-    "淡水區": 20
-  }
+    "三峽區": 45,
+    "三芝區": 10,
+    "三重區": 86,
+    "中和區": 86,
+    "五股區": 28,
+    "八里區": 14,
+    "土城區": 66,
+    "坪林區": 2,
+    "平溪區": 3,
+    "新店區": 81,
+    "新莊區": 106,
+    "板橋區": 151,
+    "林口區": 59,
+    "樹林區": 45,
+    "永和區": 62,
+    "汐止區": 58,
+    "泰山區": 21,
+    "淡水區": 55,
+    "深坑區": 7,
+    "烏來區": 3,
+    "瑞芳區": 18,
+    "石碇區": 3,
+    "石門區": 3,
+    "萬里區": 7,
+    "蘆洲區": 65,
+    "貢寮區": 5,
+    "金山區": 6,
+    "雙溪區": 3,
+    "鶯歌區": 24
+  },
+  "types": {
+    "非營利": 48,
+    "公立": 281,
+    "私立": 781,
+    "未提供": 12
+  },
+  "matching": {
+    "matched": 1088,
+    "moe_only": 11,
+    "unmatched": 23
+  },
+  "missingFields": {
+    "registrationNumber": 1122,
+    "capacity": 23,
+    "monthlyFee": 1122
+  },
+  "keyFindings": [],
+  "notice": "僅統計公開資料；資料缺漏不代表低風險，未推估財務或輿情分數。"
 }

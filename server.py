@@ -31,7 +31,8 @@ def load_dotenv(path=None):
 
 load_dotenv()
 
-from scripts.crawl_moe import create_session, fetch_district_schools, enrich_risk_metrics, generate_insights
+from scripts.crawl_moe import create_session, fetch_district_schools, enrich_risk_metrics, generate_insights, query_schools
+from scripts.workspace_data import load_workspace_schools
 from scripts.storage_db import init_db, save_state, get_state, reset_db, get_stats, migrate_sqlite_to_rds
 from scripts.risk_engine import evaluate_school_risk, recalculate_all_schools, DEFAULT_RULES, DEFAULT_THRESHOLDS
 
@@ -41,6 +42,17 @@ init_db()
 PORT = int(os.environ.get("PORT", 8088))
 
 class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=BASE_DIR, **kwargs)
+
+    def send_json(self, value, status=200):
+        payload = json.dumps(value, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
     def end_headers(self):
         # 允許跨來源與關閉快取
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -67,24 +79,27 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
 
-        # 1. API: 取得真實教育部幼兒園資料庫
+        # Paginated official data; ?format=legacy retains the original array contract.
         if path == "/api/schools":
-            mode = query.get("mode", ["real"])[0]
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.end_headers()
-            
-            if mode == "real":
-                base_dir = os.path.dirname(os.path.abspath(__file__))
-                data_file = os.path.join(base_dir, "data", "real_schools.json")
-                if os.path.exists(data_file):
-                    with open(data_file, "r", encoding="utf-8") as f:
-                        self.wfile.write(f.read().encode("utf-8"))
+            if query.get("mode", ["real"])[0] != "real":
+                self.send_json({"status": "use_demo"})
+                return
+            try:
+                with open(os.path.join(BASE_DIR, "data", "real_schools.json"), encoding="utf-8") as f:
+                    schools = json.load(f)
+                result = query_schools(schools, query)
+                if query.get("format", [""])[0] == "legacy":
+                    result = schools
                 else:
-                    self.wfile.write(json.dumps([]).encode("utf-8"))
-            else:
-                # 回傳簡報模擬資料 (從 data.js 概念中取用)
-                self.wfile.write(json.dumps({"status": "use_demo"}).encode("utf-8"))
+                    metadata_path = os.path.join(BASE_DIR, "data", "crawl_metadata.json")
+                    if os.path.exists(metadata_path):
+                        with open(metadata_path, encoding="utf-8") as f:
+                            result["metadata"] = json.load(f)
+                self.send_json(result)
+            except ValueError as exc:
+                self.send_json({"status": "error", "message": str(exc)}, 400)
+            except OSError:
+                self.send_json({"status": "error", "message": "尚未建立園所快照，請先執行爬蟲。"}, 503)
             return
 
         # 2. API: 取得教育部大數據 Insight 報告
@@ -130,6 +145,10 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         # 5. API: 動態四構面風險計算園所清單
+        elif path == "/api/workspace":
+            self.send_json({"schools": load_workspace_schools()})
+            return
+
         elif path == "/api/risk/schools":
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -140,16 +159,7 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
             current_rules = state_data.get("rules", DEFAULT_RULES)
             current_thresholds = state_data.get("thresholds", DEFAULT_THRESHOLDS)
 
-            names = ['幸福','晨光','小橡樹','向陽','禾苗','彩虹','童心','小星星','蒲公英','暖陽','森林','青田','小樹屋','果實','晴空','樂田','花鹿','小太陽','星河','月芽','藍天','小海豚']
-            districts = ['板橋區','新莊區','三重區','中和區','淡水區','汐止區']
-            raw_schools = [{
-                "id": i,
-                "name": f"{n}幼兒園",
-                "district": districts[i % 6],
-                "address": f"新北市{districts[i % 6]}示範路{18 + i * 7}號",
-                "complete": 34 + (i - 18) * 7 if i >= 18 else (91 - i % 7),
-                "capacity": 120 + i * 5
-            } for i, n in enumerate(names)]
+            raw_schools = load_workspace_schools(state_data)
 
             result = recalculate_all_schools(raw_schools, current_rules, current_thresholds)
             self.wfile.write(json.dumps({
@@ -191,6 +201,8 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 district_code = payload.get("districtCode", "220") # 預設板橋
                 district_name = payload.get("districtName", "板橋區")
                 max_pages = int(payload.get("pages", 1))
+                if not 1 <= max_pages <= 5:
+                    raise ValueError("即時爬取 pages 必須介於 1–5；全量更新請使用 CLI")
 
                 opener = create_session()
                 raw_cards = fetch_district_schools(opener, district_code, district_name, max_pages=max_pages)
@@ -426,17 +438,7 @@ class RadarAPIHandler(http.server.SimpleHTTPRequestHandler):
                 save_state(db_data)
                 stats = get_stats()
 
-                # 準備示範園所資料
-                names = ['幸福','晨光','小橡樹','向陽','禾苗','彩虹','童心','小星星','蒲公英','暖陽','森林','青田','小樹屋','果實','晴空','樂田','花鹿','小太陽','星河','月芽','藍天','小海豚']
-                districts = ['板橋區','新莊區','三重區','中和區','淡水區','汐止區']
-                raw_schools = [{
-                    "id": i,
-                    "name": f"{n}幼兒園",
-                    "district": districts[i % 6],
-                    "address": f"新北市{districts[i % 6]}示範路{18 + i * 7}號",
-                    "complete": 34 + (i - 18) * 7 if i >= 18 else (91 - i % 7),
-                    "capacity": 120 + i * 5
-                } for i, n in enumerate(names)]
+                raw_schools = load_workspace_schools(db_data)
 
                 result = recalculate_all_schools(raw_schools, db_data.get("rules", DEFAULT_RULES), db_data.get("thresholds", DEFAULT_THRESHOLDS))
                 self.send_response(200)
@@ -465,7 +467,7 @@ class ThreadingServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
 
 def run_server():
-    with ThreadingServer(("", PORT), RadarAPIHandler) as httpd:
+    with ThreadingServer((os.environ.get("HOST", ""), PORT), RadarAPIHandler) as httpd:
         print(f"📡 幼安雷達後端伺服器 (多執行緒版) 運行於 http://localhost:{PORT}")
         try:
             httpd.serve_forever()

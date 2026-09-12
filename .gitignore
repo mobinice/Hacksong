@@ -46,3 +46,6 @@ desktop.ini
 *restore*
 AWS_RESTORE_GUIDE.md
 RESTORE_COMPANY_AWS.md
+
+# Partial crawler development snapshots
+data/sample_*.json
