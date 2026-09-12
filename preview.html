@@ -11,14 +11,15 @@ const names=['幸福','晨光','小橡樹','向陽','禾苗','彩虹','童心','
 const schools=names.map((n,i)=>({id:i,name:n+'幼兒園',district:districts[i%6],address:'新北市'+districts[i%6]+'示範路'+(18+i*7)+'號',score:scores[i],complete:i>=18?34+(i-18)*7:91-i%7,type:i%3===0?'公辦民營':'私立',capacity:120+i*5,trend:[12,8,15,0,11,3,0,-2,4,6,0,-3,1,0,2,0,-1,0,0,0,0,0][i],x:12+(i%5)*18+(Math.floor(i/5)%2)*4,y:13+Math.floor(i/5)*17+(i%2)*5}));
 // Persistent mode: LocalStorage + Cloud DB (AWS RDS PostgreSQL) backend persistence
 let dbBackend = 'AWS RDS PostgreSQL';
-const initial={reviews:{},fields:[{name:'核定招生人數',type:'數字',source:'園所基本資料',unit:'人',risk:true,show:true},{name:'月收費',type:'金額',source:'收費公告',unit:'元',risk:true,show:true},{name:'年度人事費',type:'金額',source:'公開財務資料',unit:'元',risk:true,show:true},{name:'近一年裁罰次數',type:'數字',source:'裁罰資料',unit:'次',risk:true,show:true}],rules:[{id:'repeat',name:'一年內重複裁罰',dimension:'法遵／裁罰／評鑑',weight:20,threshold:1,condition:'近 12 個月同類型裁罰按次累加',impact:'高',enabled:true,date:'2026-09-12'},{id:'eval',name:'評鑑缺失或待改善',dimension:'法遵／裁罰／評鑑',weight:20,threshold:1,condition:'基礎評鑑指標未全數通過或列為待改善',impact:'高',enabled:true,date:'2026-09-12'},{id:'staff',name:'每生人事成本偏高',dimension:'財務／收費',weight:20,threshold:98000,condition:'年度人事費 ÷ 實際學生數 > 98,000 元／生（前 10% 門檻）',impact:'高',enabled:true,date:'2026-09-12'},{id:'growth',name:'人事費增加快於學生人數',dimension:'財務／收費',weight:15,threshold:30,condition:'人事費年增率 > 30% 且大於學生數年增率',impact:'中',enabled:true,date:'2026-09-12'},{id:'income',name:'收費推估與申報收入差異',dimension:'資料／營運一致性',weight:15,threshold:20,condition:'收費公告推估年收入與申報收入差異超過 20%',impact:'中',enabled:true,date:'2026-09-12'},{id:'signals',name:'近期負面輿情增加',dimension:'輿情預警',weight:10,threshold:200,condition:'近 7 日負面訊號比基準訊號增加超過 200%',impact:'低',enabled:true,date:'2026-09-12'}],sources:['園所基本資料','評鑑資料','裁罰資料','收費公告','公開財務資料','輿情資料'].map((name,i)=>({name,count:[22,20,18,19,18,22][i],updated:'2026/09/12 08:30',status:i===4?'待補充':'正常',note:i===4?'4 間園所尚未提供完整財務資料。':'展示用模擬資料，未連接外部服務。'})),version:2,history:[],thresholds:[40,60,75]};let db;try{db=JSON.parse(localStorage.getItem('youan-demo-v2'))||structuredClone(initial)}catch{db=structuredClone(initial)}let page='overview',tab='fields',selected=null,metric='',filters={q:'',district:'',risk:'',sort:'risk'},timer;
+const initial={reviews:{},schoolData:{},fields:[{name:'核定招生人數',type:'數字',source:'園所基本資料',unit:'人',risk:true,show:true},{name:'月收費',type:'金額',source:'收費公告',unit:'元',risk:true,show:true},{name:'年度人事費',type:'金額',source:'公開財務資料',unit:'元',risk:true,show:true},{name:'近一年裁罰次數',type:'數字',source:'裁罰資料',unit:'次',risk:true,show:true}],rules:[{id:'repeat',name:'一年內重複裁罰',dimension:'法遵／裁罰／評鑑',weight:20,threshold:1,condition:'近 12 個月同類型裁罰按次累加',impact:'高',enabled:true,date:'2026-09-12'},{id:'eval',name:'評鑑缺失或待改善',dimension:'法遵／裁罰／評鑑',weight:20,threshold:1,condition:'基礎評鑑指標未全數通過或列為待改善',impact:'高',enabled:true,date:'2026-09-12'},{id:'staff',name:'每生人事成本偏高',dimension:'財務／收費',weight:20,threshold:98000,condition:'年度人事費 ÷ 實際學生數 > 98,000 元／生（前 10% 門檻）',impact:'高',enabled:true,date:'2026-09-12'},{id:'growth',name:'人事費增加快於學生人數',dimension:'財務／收費',weight:15,threshold:30,condition:'人事費年增率 > 30% 且大於學生數年增率',impact:'中',enabled:true,date:'2026-09-12'},{id:'income',name:'收費推估與申報收入差異',dimension:'資料／營運一致性',weight:15,threshold:20,condition:'收費公告推估年收入與申報收入差異超過 20%',impact:'中',enabled:true,date:'2026-09-12'},{id:'signals',name:'近期負面輿情增加',dimension:'輿情預警',weight:10,threshold:200,condition:'近 7 日負面訊號比基準訊號增加超過 200%',impact:'低',enabled:true,date:'2026-09-12'}],sources:['園所基本資料','評鑑資料','裁罰資料','收費公告','公開財務資料','輿情資料'].map((name,i)=>({name,count:[22,20,18,19,18,22][i],updated:'2026/09/12 08:30',status:i===4?'待補充':'正常',note:i===4?'4 間園所尚未提供完整財務資料。':'展示用模擬資料，未連接外部服務。'})),version:2,history:[],thresholds:[40,60,75]};let db;try{db=JSON.parse(localStorage.getItem('youan-demo-v2'))||structuredClone(initial)}catch{db=structuredClone(initial)}if(!db.schoolData)db.schoolData={};if(!Array.isArray(db.thresholds)||db.thresholds.length<3)db.thresholds=[40,60,75];let page='overview',tab='fields',selected=null,metric='',filters={q:'',district:'',risk:'',sort:'risk'},timer;
+const API_BASE = window.API_BASE || (window.location.hostname.includes('s3') || window.location.hostname.includes('amazonaws.com') || window.location.protocol === 'file:' ? 'http://54.191.62.21' : '');
 let syncTimer=null;
 function persist(){
   try{
     localStorage.setItem('youan-demo-v2',JSON.stringify(db));
     if(syncTimer)clearTimeout(syncTimer);
     syncTimer=setTimeout(()=>{
-      fetch('/api/storage/save',{
+      fetch(API_BASE + '/api/storage/save',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({db})
@@ -34,7 +35,7 @@ function persist(){
 }
 async function syncFromStorage(){
   try{
-    const res=await fetch('/api/storage/state');
+    const res=await fetch(API_BASE + '/api/storage/state');
     if(res.ok){
       const data=await res.json();
       if(data.backend)dbBackend=data.backend;
@@ -68,13 +69,13 @@ function confirmResetDemo(){
   `);
 }
 async function resetDemoData(){
-  try{await fetch('/api/storage/reset',{method:'POST'});}catch{}
+  try{await fetch(API_BASE + '/api/storage/reset',{method:'POST'});}catch{}
   localStorage.removeItem('youan-demo-v2');
   try{indexedDB.deleteDatabase('youan-evaluation-files');}catch{}
   location.reload();
 }
 function toast(t){$('#toast').textContent=t;$('#toast').classList.remove('hidden');clearTimeout(timer);timer=setTimeout(()=>$('#toast').classList.add('hidden'),3600)}
-function level(s){return s.complete<60?'資料不足':s.score>=db.thresholds[2]?'高風險':s.score>=db.thresholds[1]?'中高風險':s.score>=db.thresholds[0]?'中風險':'低風險'}function cls(s){return s.complete<60?'unknown':level(s)==='高風險'?'high':level(s)==='低風險'?'low':'mid'}function status(s){return db.reviews[s.id]?.status||'待查核'}
+function level(s){const th=(db&&Array.isArray(db.thresholds)&&db.thresholds.length>=3)?db.thresholds:[40,60,75];return s.complete<60?'資料不足':s.score>=th[2]?'高風險':s.score>=th[1]?'中高風險':s.score>=th[0]?'中風險':'低風險'}function cls(s){return s.complete<60?'unknown':level(s)==='高風險'?'high':level(s)==='低風險'?'low':'mid'}function status(s){return db.reviews[s.id]?.status||'待查核'}
 function reasons(s){if(s.complete<60)return [{title:'缺少完整財務與收費資料',summary:'目前資料完整度只有 '+s.complete+'%，暫無法完整評估。',source:'資料來源完整度檢查',observation:'公開財務資料缺漏，部分收費欄位尚未更新。',rule:'資料完整度未達 60%，優先標示資料不足，不列為低風險。',action:'補齊年度財務報告與收費公告',items:['取得最新財務報告','確認收費公告及招生人數']}];if(s.score<40)return [{title:'目前未觸及主要風險條件',summary:'已取得資料未呈現重大差異，仍應依例行流程持續觀察。',source:'園所、裁罰及公開財務模擬資料',observation:'裁罰次數 0 次；收入差異 4%；資料完整度 '+s.complete+'%。',rule:'以裁罰紀錄、同類比較及跨來源差異交叉檢查。',action:'依例行排程確認資料',items:['確認資料更新日期','追蹤下一期公開資料']}];return [{title:'近一年有 2 次同類型裁罰',summary:'相同缺失重複出現，建議優先確認改善情形。',source:'公開裁罰資料（模擬）｜2026/02、2026/07',observation:'兩筆紀錄皆涉及人員配置，前次改善成果尚待確認。',rule:'近 12 個月同類型裁罰達 2 次以上，提高法遵風險。',action:'追蹤前次裁罰改善情形',items:['調閱前次改善計畫','確認複查結果及人員配置']},{title:'每生人事成本高於同類園所',summary:'本園每生 146,000 元，同類園所多為 72,000～98,000 元。',source:'2025 年度公開財務資料、園所基本資料（模擬）',observation:'比較範圍為同區域、同類型及相近招生規模的 12 間園所。',rule:'高於同類園所前 10% 高值範圍，提高財務風險。',action:'確認人員配置與人事支出',items:['比對員工名冊與薪資明細','確認臨時及外包人員費用'],compare:true},{title:'收入資料存在較大差異',summary:'收費推估年收入 600 萬元，財務申報為 920 萬元，差異約 53%。',source:'收費公告、招生人數、年度財務報告（模擬）',observation:'月費 5,000 元 × 100 人 × 12 個月 = 600 萬元；與申報差額 320 萬元。',rule:'跨來源推估與申報收入差異超過 20%，建議確認其他收入來源。',action:'確認收費與收入來源',items:['核對實際招生人數及月費','釐清延托、代辦及其他收入']},{title:'人事費增加快於學生人數',summary:'年度人事費由 1,043 萬增至 1,460 萬（約增加 40%），學生數約增加 5%。',source:'2024、2025 年度財務報告與招生資料（模擬）',observation:'支出增加 417 萬元；學生數由 95 人增至 100 人。',rule:'人事支出年增幅超過 30% 且高於學生增幅，列為年度變化異常。',action:'核對年度支出變化',items:['確認薪資調整及一次性支出','比對兩年度學生及員工人數']}].slice(0,s.score>=75?4:2)}
 function dirty(){const f=$('#review-form');return f&&new FormData(f).get('dirty')==='yes'}function go(to,id){if(dirty()){openModal('尚未儲存覆核內容',`<p>離開後，本次未儲存的內容將不會保留。</p><div class="form-actions"><button onclick="closeModal()">繼續編輯</button><button class="primary" onclick="closeModal();navigate('${to}',${id??'null'})">放棄修改並離開</button></div>`);return}navigate(to,id)}function navigate(to,id){page=to;if(id!=null)selected=id;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.id==='nav-'+(to==='detail'?'overview':to)));render();scrollTo(0,0)}function render(){if(page==='overview')overview();else if(page==='detail')detail();else settings()}
 function listData(){return schools.filter(s=>(!filters.q||(s.name+s.address).includes(filters.q))&&(!filters.district||s.district===filters.district)&&(!filters.risk||level(s)===filters.risk)&&(!metric||(metric==='high'?level(s)==='高風險':metric==='rising'?s.trend>=10:metric==='pending'?status(s)==='待查核':s.complete<60))).sort((a,b)=>filters.sort==='complete'?a.complete-b.complete:filters.sort==='trend'?b.trend-a.trend:(b.complete>=60?b.score:-1)-(a.complete>=60?a.score:-1))}
@@ -94,7 +95,7 @@ async function generateBedrockAdvice(id,force=false){
     const ast = typeof assessment==='function'?assessment(s):null;
     const reasonsList = (ast&&ast.rows.filter(r=>r.hit).length)?ast.rows.filter(r=>r.hit).map(r=>({title:r.name,summary:r.action,observation:r.formula})):reasons(s);
     const scoreVal = ast ? ast.score : s.score;
-    const res=await fetch('/api/bedrock/audit-advice',{
+    const res=await fetch(API_BASE + '/api/bedrock/audit-advice',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({schoolId:s.id,schoolName:s.name,district:s.district,type:s.type,capacity:s.capacity,riskScore:scoreVal,riskReasons:reasonsList})
