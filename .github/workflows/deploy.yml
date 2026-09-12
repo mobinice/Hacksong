@@ -1,0 +1,57 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    tags:
+      - 'deploy_*'
+
+jobs:
+  deploy:
+    name: Deploy to EC2 (${{ github.ref_name }})
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Deploy Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Verify SSH Connection
+        run: |
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful! Host uptime:' && uptime"
+
+      - name: Deploy Code via Rsync
+        run: |
+          rsync -avz --delete \
+            --exclude='.git*' \
+            --exclude='RESTORE*' \
+            --exclude='*restore*' \
+            --exclude='*.pem' \
+            --exclude='*.key' \
+            --exclude='.env*' \
+            ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.EC2_TARGET_DIR }}/
+
+      - name: Set Permissions and Reload Services
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'REMOTE_SCRIPT'
+            sudo chown -R ubuntu:ubuntu ${{ secrets.EC2_TARGET_DIR }}
+            sudo systemctl reload nginx
+            echo "Nginx reloaded successfully."
+          REMOTE_SCRIPT
+
+      - name: Health Check
+        run: |
+          echo "Checking HTTP status at http://${{ secrets.EC2_HOST }}/ ..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/)
+          echo "Received HTTP status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 304 ]; then
+            echo "Deployment verified healthy!"
+          else
+            echo "Health check failed with status code $HTTP_STATUS"
+            exit 1
+          fi

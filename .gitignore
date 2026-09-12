@@ -35,3 +35,9 @@ desktop.ini
 ~$*
 *.tmp
 *.bak
+
+# Company AWS backup & restore documentation
+*RESTORE*
+*restore*
+AWS_RESTORE_GUIDE.md
+RESTORE_COMPANY_AWS.md
