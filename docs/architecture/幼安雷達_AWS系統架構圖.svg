@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f8fbfd"/><stop offset="1" stop-color="#eef4f8"/></linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0d766e"/><stop offset="1" stop-color="#125b73"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#17324d" flood-opacity=".11"/></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#7e9bb2"/></marker>
+    <style>
+      text{font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;fill:#17324d}
+      .title{font-size:39px;font-weight:700;letter-spacing:1px}.subtitle{font-size:18px;fill:#688098}
+      .lane{font-size:15px;font-weight:700;letter-spacing:2px;fill:#607b93}.card{fill:#fff;stroke:#d8e3ec;stroke-width:1.5;filter:url(#shadow)}
+      .h{font-size:20px;font-weight:700}.p{font-size:14px;fill:#667d92}.service{font-size:15px;font-weight:700;fill:#fff}.serviceSub{font-size:12px;fill:#dff4f1}
+      .tag{font-size:11px;font-weight:700;letter-spacing:1px;fill:#fff}.note{font-size:13px;fill:#607a90}.arrow{fill:none;stroke:#7e9bb2;stroke-width:3;marker-end:url(#arrow)}
+      .flow{font-size:12px;font-weight:700;fill:#54718b}.small{font-size:12px;fill:#6d8397}.strong{font-size:13px;font-weight:700}
+    </style>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <circle cx="1750" cy="-30" r="250" fill="#e5f2f3"/><circle cx="80" cy="1020" r="220" fill="#e9eef8"/>
+
+  <text x="96" y="75" class="title">幼安雷達｜AWS 系統架構</text>
+  <text x="96" y="111" class="subtitle">分散資料整合 → 固定格式文件結構化 → 可解釋風險排序 → 人工查核與追蹤</text>
+  <rect x="1598" y="45" width="226" height="48" rx="24" fill="#17324d"/><text x="1711" y="76" text-anchor="middle" class="service">Hackathon MVP</text>
+
+  <text x="95" y="174" class="lane">01｜資料來源</text>
+  <text x="455" y="174" class="lane">02｜擷取與文件處理</text>
+  <text x="910" y="174" class="lane">03｜整合、儲存與風險分析</text>
+  <text x="1450" y="174" class="lane">04｜承辦人工作介面</text>
+
+  <!-- source cards -->
+  <g>
+    <rect class="card" x="90" y="205" width="270" height="112" rx="16"/><rect x="90" y="205" width="8" height="112" rx="4" fill="#2b6de8"/>
+    <circle cx="132" cy="247" r="22" fill="#eaf1ff"/><path d="M120 248h24M132 236v24M121 239l22 18M143 239l-22 18" stroke="#2b6de8" stroke-width="2"/>
+    <text x="167" y="244" class="h">公開網站／開放資料</text><text x="167" y="270" class="p">園所基本資料、招生人數</text><text x="167" y="291" class="p">CSV／Excel／JSON</text>
+
+    <rect class="card" x="90" y="343" width="270" height="112" rx="16"/><rect x="90" y="343" width="8" height="112" rx="4" fill="#7d3ce7"/>
+    <rect x="111" y="365" width="42" height="50" rx="5" fill="#f0eafe" stroke="#7d3ce7"/><path d="M121 378h22M121 387h22M121 396h16" stroke="#7d3ce7" stroke-width="2"/>
+    <text x="167" y="382" class="h">財務／評鑑 PDF</text><text x="167" y="408" class="p">會計師報告、評鑑檢核表</text><text x="167" y="429" class="p">固定格式文件</text>
+
+    <rect class="card" x="90" y="481" width="270" height="112" rx="16"/><rect x="90" y="481" width="8" height="112" rx="4" fill="#dc5a43"/>
+    <circle cx="132" cy="523" r="22" fill="#fff0ed"/><path d="M122 523h20M132 513v20" stroke="#dc5a43" stroke-width="3"/>
+    <text x="167" y="520" class="h">裁罰／收費資料</text><text x="167" y="546" class="p">裁罰紀錄、收費公告</text><text x="167" y="567" class="p">歷史年度與來源定位</text>
+
+    <rect class="card" x="90" y="619" width="270" height="112" rx="16"/><rect x="90" y="619" width="8" height="112" rx="4" fill="#168976"/>
+    <circle cx="132" cy="661" r="22" fill="#e4f6f1"/><path d="M121 663l8 8 16-20" fill="none" stroke="#168976" stroke-width="3"/>
+    <text x="167" y="658" class="h">承辦人手動匯入</text><text x="167" y="684" class="p">補件、修正與來源確認</text><text x="167" y="705" class="p">人工確認後才寫入</text>
+  </g>
+
+  <!-- ingestion -->
+  <g>
+    <rect x="455" y="220" width="340" height="90" rx="18" fill="#173f66" filter="url(#shadow)"/>
+    <rect x="476" y="240" width="88" height="27" rx="13" fill="#ff9900"/><text x="520" y="258" text-anchor="middle" class="tag">AWS S3</text>
+    <text x="584" y="255" class="service">Private 原始文件區</text><text x="584" y="280" class="serviceSub">保留原始檔、來源與版本</text>
+
+    <rect class="card" x="455" y="349" width="340" height="96" rx="18"/><rect x="476" y="370" width="118" height="27" rx="13" fill="#d45b07"/><text x="535" y="388" text-anchor="middle" class="tag">EventBridge</text>
+    <text x="616" y="386" class="h">匯入事件觸發</text><text x="476" y="420" class="p">上傳後觸發流程，也可排程更新公開資料</text>
+
+    <rect class="card" x="455" y="484" width="340" height="96" rx="18"/><rect x="476" y="505" width="88" height="27" rx="13" fill="#e85d04"/><text x="520" y="523" text-anchor="middle" class="tag">Lambda</text>
+    <text x="584" y="521" class="h">Importer</text><text x="476" y="555" class="p">格式辨識、基本驗證、建立來源追溯資訊</text>
+
+    <rect class="card" x="455" y="619" width="158" height="112" rx="18"/><rect x="475" y="640" width="84" height="27" rx="13" fill="#5c39b7"/><text x="517" y="658" text-anchor="middle" class="tag">Textract</text>
+    <text x="475" y="692" class="h">文件 OCR</text><text x="475" y="716" class="p">表格／欄位擷取</text>
+    <rect class="card" x="637" y="619" width="158" height="112" rx="18"/><rect x="657" y="640" width="84" height="27" rx="13" fill="#5c39b7"/><text x="699" y="658" text-anchor="middle" class="tag">Bedrock</text>
+    <text x="657" y="692" class="h">欄位理解</text><text x="657" y="716" class="p">摘要／對應建議</text>
+  </g>
+
+  <!-- central engine -->
+  <g>
+    <rect x="900" y="218" width="420" height="114" rx="20" fill="url(#brand)" filter="url(#shadow)"/>
+    <rect x="925" y="241" width="88" height="27" rx="13" fill="#ff9900"/><text x="969" y="259" text-anchor="middle" class="tag">Lambda</text>
+    <text x="1032" y="258" class="service" style="font-size:20px">Normalize &amp; Entity Match</text>
+    <text x="925" y="291" class="serviceSub">園所識別碼歸戶 · 欄位標準化 · 年度／口徑檢查 · 保留原文 Evidence</text>
+
+    <rect class="card" x="900" y="376" width="420" height="138" rx="20"/><rect x="925" y="399" width="104" height="27" rx="13" fill="#3f8624"/><text x="977" y="417" text-anchor="middle" class="tag">DynamoDB</text>
+    <text x="1048" y="417" class="h">彈性資料與設定</text>
+    <text x="925" y="454" class="strong">schools / annual_records / evidence</text>
+    <text x="925" y="479" class="strong">field_config / rules / weights / reviews</text>
+    <text x="925" y="501" class="p">新增欄位不需 Schema Migration</text>
+
+    <rect x="900" y="560" width="420" height="171" rx="20" fill="#173f66" filter="url(#shadow)"/>
+    <rect x="925" y="583" width="88" height="27" rx="13" fill="#e85d04"/><text x="969" y="601" text-anchor="middle" class="tag">Lambda</text>
+    <text x="1032" y="601" class="service" style="font-size:20px">可解釋風險引擎</text>
+    <text x="925" y="640" class="serviceSub">同區／同類園所比較 · 歷史趨勢 · 資料完整度</text>
+    <text x="925" y="669" class="serviceSub">裁罰按次累加 · 規則權重合計 100% · 缺資料不當成 0</text>
+    <rect x="925" y="692" width="365" height="24" rx="12" fill="#ffffff18"/><text x="1107" y="709" text-anchor="middle" class="serviceSub">輸出：風險分數 + 構面 + 公式 + 原始證據 + 查核建議</text>
+  </g>
+
+  <!-- delivery -->
+  <g>
+    <rect class="card" x="1435" y="235" width="390" height="112" rx="20"/><rect x="1458" y="258" width="88" height="27" rx="13" fill="#e85d04"/><text x="1502" y="276" text-anchor="middle" class="tag">Lambda</text>
+    <text x="1565" y="276" class="h">Function URL / API</text><text x="1458" y="314" class="p">MVP 省略 API Gateway，提供查詢與操作端點</text>
+
+    <rect x="1435" y="394" width="390" height="337" rx="24" fill="#fff" stroke="#cfdde8" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="1435" y="394" width="390" height="72" rx="24" fill="#24395b"/><path d="M1435 442h390v24h-390z" fill="#24395b"/>
+    <rect x="1460" y="417" width="96" height="27" rx="13" fill="#ff9900"/><text x="1508" y="435" text-anchor="middle" class="tag">AMPLIFY</text>
+    <text x="1576" y="436" class="service" style="font-size:20px">幼安雷達 Web App</text>
+    <g transform="translate(1465 492)">
+      <rect x="0" y="0" width="160" height="86" rx="12" fill="#eef4ff"/><text x="18" y="32" class="h">資料工作台</text><text x="18" y="59" class="p">整合／來源／Excel</text>
+      <rect x="184" y="0" width="160" height="86" rx="12" fill="#edf8f5"/><text x="202" y="32" class="h">風險總覽</text><text x="202" y="59" class="p">地圖／排序／篩選</text>
+      <rect x="0" y="105" width="160" height="86" rx="12" fill="#fff5ed"/><text x="18" y="137" class="h">風險詳情</text><text x="18" y="164" class="p">權重／公式／證據</text>
+      <rect x="184" y="105" width="160" height="86" rx="12" fill="#f5f0ff"/><text x="202" y="137" class="h">查核管理</text><text x="202" y="164" class="p">覆核／追蹤／交辦</text>
+    </g>
+  </g>
+
+  <!-- arrows -->
+  <path class="arrow" d="M360 261H430Q444 261 444 275V265Q444 255 455 255"/>
+  <path class="arrow" d="M360 399H430Q444 399 444 385V273"/>
+  <path class="arrow" d="M360 537H430Q444 537 444 523H455"/>
+  <path class="arrow" d="M360 675H425Q444 675 444 545"/>
+  <path class="arrow" d="M625 310V349"/><text x="644" y="334" class="flow">新檔事件</text>
+  <path class="arrow" d="M625 445V484"/>
+  <path class="arrow" d="M570 580V619"/><path class="arrow" d="M681 580V619"/>
+  <path class="arrow" d="M795 675H850Q872 675 872 653V292Q872 275 900 275"/><text x="805" y="656" class="flow">結構化結果</text>
+  <path class="arrow" d="M1110 332V376"/><text x="1125" y="358" class="flow">寫入＋追溯</text>
+  <path class="arrow" d="M1110 514V560"/><text x="1125" y="543" class="flow">資料＋規則</text>
+  <path class="arrow" d="M1320 646H1385Q1405 646 1405 622V291Q1405 275 1435 275"/><text x="1332" y="628" class="flow">結果 API</text>
+  <path class="arrow" d="M1630 347V394"/><text x="1648" y="374" class="flow">HTTPS</text>
+
+  <!-- foundation -->
+  <rect x="90" y="805" width="1735" height="157" rx="22" fill="#e9f0f6" stroke="#d2dfe9"/>
+  <text x="121" y="842" class="lane">安全、治理與維運基礎</text>
+  <g transform="translate(121 866)">
+    <rect x="0" y="0" width="356" height="67" rx="13" fill="#fff"/><circle cx="32" cy="34" r="16" fill="#fff0d7"/><text x="32" y="39" text-anchor="middle" class="strong" fill="#a55d00">K</text><text x="61" y="29" class="strong">S3 Private＋KMS</text><text x="61" y="50" class="small">原始文件不公開，靜態加密</text>
+    <rect x="380" y="0" width="356" height="67" rx="13" fill="#fff"/><circle cx="412" cy="34" r="16" fill="#e9edff"/><text x="412" y="39" text-anchor="middle" class="strong" fill="#4b5cc4">I</text><text x="441" y="29" class="strong">IAM 最小權限</text><text x="441" y="50" class="small">每個 Lambda 僅取得必要資源</text>
+    <rect x="760" y="0" width="356" height="67" rx="13" fill="#fff"/><circle cx="792" cy="34" r="16" fill="#e5f7ed"/><text x="792" y="39" text-anchor="middle" class="strong" fill="#24734d">C</text><text x="821" y="29" class="strong">CloudWatch</text><text x="821" y="50" class="small">流程日誌、錯誤監控、指標與告警</text>
+    <rect x="1140" y="0" width="445" height="67" rx="13" fill="#fff"/><circle cx="1172" cy="34" r="16" fill="#feecee"/><text x="1172" y="39" text-anchor="middle" class="strong" fill="#b23a48">E</text><text x="1201" y="29" class="strong">Evidence First</text><text x="1201" y="50" class="small">AI 只提供輔助判斷，承辦人可查看原文與人工確認</text>
+  </g>
+
+  <text x="96" y="1020" class="note">MVP 設計原則：優先完成資料整合、來源追溯與異常辨識；Function URL 可於正式化時替換為 API Gateway。</text>
+  <text x="1824" y="1020" text-anchor="end" class="note">幼安雷達 · Bug 不過夜</text>
+</svg>
