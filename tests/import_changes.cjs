@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('assets/youan-p0.js','utf8');
+const fn=source.slice(source.indexOf('  function importChanges(row){'),source.indexOf('  Y.importChanges=importChanges;'));
+const context={matching:v=>v.schoolId==='A'?{id:'A',address:'舊地址'}:null,db:{schoolData:{}},numericImportFields:['staffCost','studentCount'],current:(id,key,year)=>({value:({'2025':{staffCost:1000,studentCount:0},'2024':{staffCost:800}})[year]?.[key]})};
+vm.createContext(context);vm.runInContext(fn,context);
+const changes=v=>JSON.parse(JSON.stringify(context.importChanges({values:v})));
+assert.deepEqual(changes({schoolId:'A',name:'園所',district:'區',year:'2025',staffCost:'1000.00',studentCount:'0',address:'舊地址'}),[]);
+assert.equal(changes({schoolId:'A',year:'2024',staffCost:'1000'})[0].before,800);
+assert.equal(changes({schoolId:'A',year:'2025',staffCost:'1200'})[0].conflict,true);
+assert.deepEqual(changes({schoolId:'A',year:'2025',staffCost:''}),[]);
+assert.equal(changes({schoolId:'NEW',year:'2025',staffCost:'0'})[0].after,'0');
+assert.equal(changes({schoolId:'A',year:'2025',address:'新地址'})[0].before,'舊地址');
+console.log('Import differences: same values, year scope, zero, empty, new and changed values passed');

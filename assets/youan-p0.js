@@ -738,18 +738,40 @@
   renderImport=()=>{oldImportRender();const panel=$('#import-panel');if(panel){for(const s of panel.querySelectorAll('.step'))s.innerHTML=s.innerHTML.replace('AI 辨識與勾選欄位','欄位對應與勾選');} };
   function matching(v){if(v.schoolId){const m=/^YA-(\d+)$/.exec(v.schoolId);return m?schoolById(Number(m[1])-1):schoolById(v.schoolId);}const hits=schools.filter(s=>s.name===v.name&&s.district===v.district);return hits.length===1?hits[0]:null;}
   validateImportRow=row=>{const v=row.values,errors=[];if(!v.name?.trim())errors.push('缺少園所名稱');if(!/^\d{4}$/.test(v.year||'')||Number(v.year)<1900||Number(v.year)>2100)errors.push('資料年度需為 1900–2100 西元四碼');if(!v.district?.trim())errors.push('缺少行政區');const target=matching(v);if(v.schoolId&&!target)errors.push('園所識別碼不存在，新增園所請清空識別碼');if(target&&v.name!==target.name)errors.push('識別碼與園所名稱不一致');if(target&&v.district!==target.district)errors.push('识別碼與行政區不一致');if(!target&&!v.address?.trim())errors.push('新增園所需有地址');for(const k of numericImportFields)if(v[k]!==undefined&&v[k]!==''&&(!/^\d+(\.\d+)?$/.test(v[k])||!Number.isFinite(Number(v[k]))))errors.push(label(k)+'需為非負數字');for(const k of ['capacity','studentCount','sourceStudentCount','previousStudentCount','penaltyCount','signalCount','signalBaseline'])if(v[k]&&Number(v[k])%1!==0)errors.push(label(k)+'需為整數');for(const k of ['penaltyDate','evaluationDate'])if(v[k]){const iso=v[k].replaceAll('/','-');const m=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(iso);if(!m||new Date(Date.UTC(+m[1],+m[2]-1,+m[3])).toISOString().slice(0,10)!==`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`)errors.push(label(k)+'日期無效');}if(importSession.preview.some(o=>o!==row&&o.include&&o.values.name===v.name&&o.values.district===v.district&&o.values.year===v.year))errors.push('同園所同年度重複列');return {errors,target};};
-  const previousPreview=previewPanel;
-  previewPanel=()=>previousPreview().replaceAll('示範資料將新增或更新在此 Demo 中；新園所顯示「資料不足」，不會直接判定為低風險。','確認後保存本機來源並重算。同年度不同數值會標示來源衝突，待人工選擇；不會直接覆蓋既有數值。');
+  function importChanges(row){
+    const target=matching(row.values),year=String(row.values.year);
+    return Object.entries(row.values).filter(([key,value])=>!['schoolId','name','district','year'].includes(key)&&value!==''&&value!=null).flatMap(([key,value])=>{
+      const before=target?(['address','type'].includes(key)?db.schoolData[target.id]?.values?.[key]??target[key]:current(target.id,key,year)?.value):undefined;
+      const equal=before!=null&&(numericImportFields.includes(key)?Number(before)===Number(value):String(before)===String(value));
+      return equal?[]:[{key,before,after:value,conflict:!!target&&!['address','type'].includes(key)&&before!=null}];
+    });
+  }
+  Y.importChanges=importChanges;
+  previewPanel=()=>{
+    const st=importSession,visible=st.preview.map((row,i)=>({row,i,changes:importChanges(row),check:validateImportRow(row)})).filter(x=>x.changes.length||x.check.errors.length);
+    return `<div class="panel"><div class="panel-head"><div><h2>確認本次資料變更</h2><p>${esc(st.file)} · 只列出新增或數值不同的欄位。</p></div><button onclick="importSession.step=2;renderImport()">返回欄位對應</button></div><div class="pad"><div id="import-summary" class="import-stats"></div><div class="notice">「匯入後值」為本次檔案內容。既有數值不同時會保留新來源並標示待確認，需到工作台選擇採用後才影響評分；空白值不清除原資料。</div><div id="import-error" class="form-error" role="alert"></div></div>${visible.map(({row,i,changes,check})=>`<section id="import-row-${i}" class="pad" style="border-top:1px solid #e2e8f0"><div class="panel-head"><label class="check"><input type="checkbox" aria-label="匯入第 ${i+1} 列" ${row.include?'checked':''} onchange="importSession.preview[${i}].include=this.checked;refreshImportValidation()"><b>${esc(row.values.name||'尚未指定園所')}</b></label><span>${esc(row.values.district||'')} · ${esc(row.values.year||'未指定')} 年度</span></div><div id="validation-${i}" class="row-validation"></div>${changes.length?`<div class="table-wrap"><table><thead><tr><th>更新欄位</th><th>匯入前值</th><th>匯入後值</th></tr></thead><tbody>${changes.map(c=>`<tr><td>${esc(label(c.key))}${c.conflict?'<small>新增來源，待確認採用</small>':''}</td><td>${c.before==null?'尚無資料':esc(display(c.before))}</td><td><strong>${esc(numericImportFields.includes(c.key)&&Number.isFinite(Number(c.after))?display(Number(c.after)):c.after)}</strong></td></tr>`).join('')}</tbody></table></div>`:''}</section>`).join('')||'<div class="pad">沒有需要更新的欄位，資料與目前相同。</div>'}<div class="import-actions"><label class="check"><input type="checkbox" id="import-confirm">我已檢查更新對象與前後值</label><button class="primary" id="import-submit" onclick="commitImport()">確認匯入變更</button></div></div>`;
+  };
+  refreshImportValidation=()=>{
+    let add=0,update=0,bad=0,count=0,unchanged=0;
+    for(const [i,row]of importSession.preview.entries()){
+      const {errors,target}=validateImportRow(row),changes=importChanges(row),el=$('#validation-'+i);
+      if(!changes.length&&!errors.length)unchanged++;
+      if(row.include){if(errors.length)bad++;else if(changes.length){if(target)update++;else add++;count+=changes.length;}}
+      if(el){el.innerHTML=!row.include?'<small>不匯入</small>':errors.length?`<span class="high">${errors.map(esc).join('；')}，請返回欄位對應修正。</span>`:`<small>${target?'更新既有園所':'新增園所'} · ${changes.length} 個變更欄位</small>`;$('#import-row-'+i).classList.toggle('invalid',row.include&&errors.length>0);}
+    }
+    $('#import-summary').innerHTML=`<span>${add} 間新增</span><span>${update} 間更新</span><span>${count} 個變更欄位</span><span>${unchanged} 筆無變更已略過</span><span class="high">${bad} 筆待修正</span>`;
+    $('#import-submit').disabled=!count||bad>0;
+  };
   commitImport=()=>{
-    const st=importSession,rows=st.preview.filter(r=>r.include);
+    const st=importSession,rows=st.preview.filter(r=>r.include&&(importChanges(r).length||validateImportRow(r).errors.length));
     if(!$('#import-confirm').checked){$('#import-error').textContent='請先確認已檢查資料。';return;}if(!rows.length||rows.some(r=>validateImportRow(r).errors.length)){$('#import-error').textContent='請修正所有已勾選的資料列。';return;}
     const backup=clone(db),schoolBackup=clone(schools),districtBackup=[...districts];let added=0,updated=0,conflicts=0;const logRows=[];
     const fingerprint=JSON.stringify({file:st.file,sheet:st.sheetIndex,rows:rows.map(r=>r.values)});
     if(db.imports.some(h=>h.fingerprint===fingerprint)){$('#import-error').textContent='這份檔案的相同資料已匯入，已避免重複寫入。';return;}
-    for(const row of rows){const v=row.values;let s=matching(v);const existed=!!s;if(!s){const id=Math.max(-1,...schools.map(s=>s.id).filter(Number.isFinite))+1;s={id,name:v.name,district:v.district,address:v.address,type:v.type||'尚未提供',capacity:Number(v.capacity)||0,score:0,complete:0,trend:0,x:12+id%5*18,y:13+Math.floor(id/5)%5*17,imported:true};schools.push(s);db.importedSchools.push(s);added++;}else updated++;
+    for(const row of rows){const v=row.values,changedKeys=new Set(importChanges(row).map(c=>c.key));let s=matching(v);const existed=!!s;if(!s){const id=Math.max(-1,...schools.map(s=>s.id).filter(Number.isFinite))+1;s={id,name:v.name,district:v.district,address:v.address,type:v.type||'尚未提供',capacity:Number(v.capacity)||0,score:0,complete:0,trend:0,x:12+id%5*18,y:13+Math.floor(id/5)%5*17,imported:true};schools.push(s);db.importedSchools.push(s);added++;}else updated++;
       if(!districts.includes(s.district))districts.push(s.district);
       const sheet=st.sheets[st.sheetIndex],sourceRow=st.sourceRows?.[row.row-1]??row.row;
-      for(const [k,raw]of Object.entries(v)){if(['name','district','address','type','year','schoolId'].includes(k)||raw==='')continue;const value=numericImportFields.includes(k)?Number(raw):raw;const col=st.mapping[k];const loc=sheet.fieldLocations?.[col]||sheet.locations?.[sourceRow]||`${sheet.name} · 第 ${sourceRow+1} 列`;const sourceValue=st.rows[row.row-1]?.[col]??raw;addObservation(s.id,String(v.year),k,value,st.file,loc,`${sheet.name}｜${st.headers[col]}：${sourceValue}${String(sourceValue)!==String(raw)?`\n人工確認後：${raw}`:''}`);if(records(s.id,v.year)[k].conflict)conflicts++;}
+      for(const [k,raw]of Object.entries(v)){if(!changedKeys.has(k)||['name','district','address','type','year','schoolId'].includes(k)||raw==='')continue;const value=numericImportFields.includes(k)?Number(raw):raw;const col=st.mapping[k];const loc=sheet.fieldLocations?.[col]||sheet.locations?.[sourceRow]||`${sheet.name} · 第 ${sourceRow+1} 列`;const sourceValue=st.rows[row.row-1]?.[col]??raw;addObservation(s.id,String(v.year),k,value,st.file,loc,`${sheet.name}｜${st.headers[col]}：${sourceValue}${String(sourceValue)!==String(raw)?`\n人工確認後：${raw}`:''}`);if(records(s.id,v.year)[k].conflict)conflicts++;}
       db.schoolData[s.id]={file:st.file,at:stamp(),values:{...(db.schoolData[s.id]?.values||{}),...v}};logRows.push({id:s.id,name:s.name,action:existed?'更新':'新增',values:clone(v)});
     }
     model.year=String(rows[0].values.year);recalc('確認匯入資料',true);db.imports.unshift({id:uid(),file:st.file,sheet:st.sheets[st.sheetIndex].name,at:stamp(),categories:st.categories.map(k=>importCatalog[k].label),fields:importFields().filter(f=>st.selected[f[0]]).map(f=>f[1]),added,updated,records:logRows,fingerprint});
