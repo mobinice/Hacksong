@@ -1,0 +1,11 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const src=fs.readFileSync('assets/youan-p0.js','utf8');
+const start=src.indexOf('  const hasKnownAnomaly='),end=src.indexOf('  overview=()=>{oldOverview();',start);
+const ctx={db:{reviews:{2:{saved:'2026-09-13',status:'待查核'},3:{status:'待查核'}}},assessment:s=>({anomalies:s.anomalies})};
+vm.createContext(ctx);vm.runInContext(src.slice(start,end)+';this.known=hasKnownAnomaly;this.pending=needsHumanReview;',ctx);
+assert.equal(ctx.pending({id:1,anomalies:0}),false);
+assert.equal(ctx.known({id:2,anomalies:1}),true);
+assert.equal(ctx.pending({id:2,anomalies:1}),false);
+assert.equal(ctx.pending({id:3,anomalies:1}),true);
+assert.equal(ctx.pending({id:4,anomalies:1}),true);
+console.log('Overview anomaly/review predicates passed');

@@ -632,9 +632,11 @@
   const oldRender=render;
   render=()=>{if(page==='data')workPage();else oldRender();};
   const oldOverview=overview;
-  overview=()=>{oldOverview();$('#page > .heading')?.remove();const cards=$$('.metrics .metric');if(cards[1]){cards[1].innerHTML=`<span>有已知異常</span><strong>${activeSchools().filter(s=>assessment(s).anomalies>0).length}<small> 間</small></strong><small>包含評估資料尚不完整的園所</small>`;cards[1].onclick=()=>{metric=metric==='rising'?'':'rising';overview();};}if(cards[3])cards[3].querySelector('strong').innerHTML=`${activeSchools().filter(s=>assessment(s).coverage<60).length}<span> 間</span>`;};
+  const hasKnownAnomaly=s=>assessment(s).anomalies>0;
+  const needsHumanReview=s=>hasKnownAnomaly(s)&&!db.reviews?.[s.id]?.saved;
+  overview=()=>{oldOverview();$('#page > .heading')?.remove();const cards=$$('.metrics .metric');if(cards[1]){cards[1].innerHTML=`<span>有已知異常</span><strong>${activeSchools().filter(s=>hasKnownAnomaly(s)).length}<small> 間</small></strong><small>已觸發異常規則，含已覆核園所</small>`;cards[1].onclick=()=>{metric=metric==='rising'?'':'rising';overview();};}if(cards[2])cards[2].innerHTML=`<span>待人工確認</span><span class="arrow">↗</span><strong>${activeSchools().filter(needsHumanReview).length}<small> 間</small></strong><small>有異常，且尚未儲存人工覆核</small>`;if(cards[3])cards[3].querySelector('strong').innerHTML=`${activeSchools().filter(s=>assessment(s).coverage<60).length}<span> 間</span>`;};
   const $$=s=>Array.from(document.querySelectorAll(s));
-  listData=()=>activeSchools().filter(s=>(!filters.q||(s.name+s.address).includes(filters.q))&&(!filters.district||s.district===filters.district)&&(!filters.risk||level(s)===filters.risk)&&(!metric||(metric==='high'?level(s)==='高風險':metric==='rising'?assessment(s).anomalies>0:metric==='pending'?status(s)==='待查核':assessment(s).coverage<60))).sort((a,b)=>filters.sort==='complete'?a.complete-b.complete:b.score-a.score);
+  listData=()=>activeSchools().filter(s=>(!filters.q||(s.name+s.address).includes(filters.q))&&(!filters.district||s.district===filters.district)&&(!filters.risk||level(s)===filters.risk)&&(!metric||(metric==='high'?level(s)==='高風險':metric==='rising'?hasKnownAnomaly(s):metric==='pending'?needsHumanReview(s):assessment(s).coverage<60))).sort((a,b)=>filters.sort==='complete'?a.complete-b.complete:b.score-a.score);
   const oldResults=updateResults;
   updateResults=()=>{
     oldResults();
