@@ -172,7 +172,7 @@
     if(!analysis&&record?.demo){analysis=demoOcr(record.text||'待改善 改善事項 設施設備維護',record.fileName);record.aiAnalysis=analysis;applyOcrFinding(schoolId,recordId,analysis);}
     if(!analysis){baseViewEvaluation(schoolId,recordId);return;}
     const viewer=document.getElementById('evaluation-checklist');
-    viewer.innerHTML=`<div class="dialog-head"><div><h2 id="checklist-title">評鑑 OCR 與合規檢核</h2><small>${esc(schoolById(schoolId).name)} · ${esc(record?.title||analysis.document)}</small></div><button aria-label="關閉" onclick="document.getElementById('evaluation-checklist').close()">×</button></div><div class="dialog-body"><div class="ai-banner"><div><strong>${esc(analysis.provider||'Demo OCR')}</strong><p>${esc(analysis.notice||'結果待人工覆核。')}</p></div><span class="pill">Demo AI</span></div><div class="finding-list">${analysis.findings.map(f=>`<article class="finding ${Number(f.riskImpact)>=20?'high':''}"><h3>${esc(f.category)}</h3><p>${esc(f.summary)}</p><footer><span>${esc(f.clause)}</span><span>風險影響 +${Number(f.riskImpact||0)} 分</span><span>${esc(f.evidence)}</span></footer></article>`).join('')}</div><div class="notice">法規對照為 Demo 輔助結果；承辦人仍須核對原始文件、適用日期與完整條文。</div></div>`;
+    viewer.innerHTML=`<div class="dialog-head"><div><h2 id="checklist-title">評鑑 OCR 與合規檢核</h2><small>${esc(schoolById(schoolId).name)} · ${esc(record?.title||analysis.document)}</small></div><button aria-label="關閉" onclick="document.getElementById('evaluation-checklist').close()">×</button></div><div class="dialog-body"><div class="ai-banner"><div><strong>${esc(analysis.provider||'Demo OCR')}</strong><p>${esc(analysis.notice||'結果待人工覆核。')}</p></div><span class="pill">Demo AI</span></div>${record?.text?`<details><summary>查看文件原文</summary><pre style="white-space:pre-wrap">${esc(record.text)}</pre></details>`:''}<div class="finding-list">${analysis.findings.map(f=>`<article class="finding ${Number(f.riskImpact)>=20?'high':''}"><h3>${esc(f.category)}</h3><p>${esc(f.summary)}</p><footer><span>${esc(f.clause)}</span><span>風險影響 +${Number(f.riskImpact||0)} 分</span><span>${esc(f.evidence)}</span></footer></article>`).join('')}</div><div class="notice">法規對照為 Demo 輔助結果；承辦人仍須核對原始文件、適用日期與完整條文。</div></div>`;
     viewer.showModal();
   };
 
@@ -196,8 +196,39 @@
     for(const event of events){const key=normalize(event.title).slice(0,24)+'|'+event.date;if(seen.has(key))continue;seen.add(key);const score=Math.min(100,8+Object.entries(terms).reduce((n,[word,value])=>n+(`${event.title} ${event.excerpt}`.includes(word)?value:0),0));rows.push({...event,id:key,negativeScore:score,severity:score>=55?'高':score>=28?'中':'低',label:'未經查證之公開線索',aiSummary:`偵測到${score>=55?'高':score>=28?'中':'低'}度負向訊號，建議與正式陳情或查核紀錄交叉比對。`});}return rows.sort((a,b)=>b.date.localeCompare(a.date));
   };
   for(const [id,items] of Object.entries(demoClues))if(!db.sentimentEvents[id])db.sentimentEvents[id]=localSentiment(items);
+  // Deliberately fictional fixtures, separate from public evaluation summaries.
+  function seedHaishanDemo(){
+    const id='REAL-012';
+    db.sentimentEvents||={};db.ocrFindings||={};db.evaluationFiles||={};db.externalImpacts||={};
+    const clues=[
+      {title:'【虛構示範】接送時段人力安排疑問',date:'2026-09-12',excerpt:'模擬家長詢問接送時段人力是否不足，承辦人可進一步調閱排班表。'},
+      {title:'【虛構示範】延托收費說明討論',date:'2026-09-10',excerpt:'模擬家長對延托收費說明提出疑問，待比對公告與收費單據。'},
+      {title:'【虛構示範】餐點紀錄補件追蹤',date:'2026-09-08',excerpt:'模擬餐點留樣紀錄補件情境，展示事件追蹤與資料查證流程。'}
+    ].map((e,i)=>({...e,demo:true,id:'haishan-demo-clue-'+i,source:'虛構情境，無真實新聞來源',url:'',negativeScore:[36,20,12][i],severity:['中','低','低'][i],aiSummary:e.excerpt}));
+    db.sentimentEvents[id]||=[];
+    for(const e of clues)if(!db.sentimentEvents[id].some(x=>x.id===e.id))db.sentimentEvents[id].push(e);
+    const recordId='haishan-demo-ocr-v1';
+    db.evaluationFiles[id]||=[];db.ocrFindings[id]||=[];
+    if(!db.evaluationFiles[id].some(r=>r.id===recordId)){
+      const text='【完全虛構示範，非海山附幼實際事件或官方評鑑】\n115年度評鑑OCR操作示例\n第1頁：人員編制附件待補齊，請比對排班表。\n第2頁：餐點留樣紀錄待補充，請調閱紀錄。\n第3頁：改善事項列入追蹤，待承辦人覆核。';
+      const findings=[
+        {category:'【示範】人員編制資料',summary:'模擬辨識：人員編制附件待補齊，建議調閱排班表。',evidence:'第1頁：人員編制附件待補齊',riskImpact:18},
+        {category:'【示範】餐飲紀錄',summary:'模擬辨識：餐點留樣紀錄待補充，建議查閱原始紀錄。',evidence:'第2頁：餐點留樣紀錄待補充',riskImpact:16},
+        {category:'【示範】改善追蹤',summary:'模擬辨識：改善事項待人工確認與追蹤。',evidence:'第3頁：改善事項列入追蹤',riskImpact:12}
+      ].map(f=>({...f,clause:'示範檢核項目；適用法規待承辦人核對',verified:false}));
+      const analysis={demo:true,provider:'預先建立的虛構 Demo OCR',document:'海山_OCR操作示例_非官方.txt',findings,notice:'全部內容為虛構，不代表海山附幼存在任何缺失。單項影響供展示，本文件取最高18分，不逐項相加。'};
+      db.evaluationFiles[id].push({id:recordId,year:115,date:'2026-09-12',title:'【虛構示範】評鑑 OCR 檢核文件',result:'待確認',demo:true,fileName:analysis.document,text,aiAnalysis:analysis});
+      db.ocrFindings[id].push({recordId,at:stamp(),...analysis});
+      setImpact(id,{id:'haishan-demo-ocr',name:'【虛構示範】OCR 文件待覆核',dimension:'法遵／裁罰／評鑑',delta:18,formula:'虛構OCR三項結果取最高18分，不累加；非官方評分',action:'開啟示範文件，核對原文與待確認事項'});
+    }
+  }
+  seedHaishanDemo();
+  Y.hydrate();persist();
+  const hydrateBeforeDemo=Y.hydrate;
+  Y.hydrate=()=>{seedHaishanDemo();hydrateBeforeDemo();};
   Y.refreshSentiment=async id=>{
     const raw=demoClues[id]||db.sentimentEvents[id]||[];let result;
+    if(String(id)==='REAL-012'){seedHaishanDemo();persist();if(page==='detail')detail();toast('已重新整理虛構示範輿情，未查詢真實新聞');return;}
     try{result=await apiPost('/api/ai/sentiment',{events:raw})}catch{result={events:localSentiment(raw),provider:'瀏覽器內 Demo 情緒分析'}}
     db.sentimentEvents[id]=result.events;persist();if(page==='detail'&&String(id)===String(selected))detail();toast('Demo AI 已完成去重與嚴重度分析');
   };
@@ -208,7 +239,7 @@
   }
   function sentimentPanel(id){
     const events=db.sentimentEvents[id]||[];
-    return `<section class="panel"><div class="panel-head"><div><h2>AI 輿情預警時間軸</h2><p>已去除重複事件，保留可回查的公開來源。</p></div><button onclick="Y.refreshSentiment(${esc(JSON.stringify(id))})">重新分析</button></div><div class="clue-timeline">${events.length?events.map(event=>{const url=safeUrl(event.url);return `<article class="clue ${event.severity==='高'?'high':''}"><div class="clue-meta"><span>${esc(event.date||'日期不明')}</span><span class="unverified">未經查證之公開線索</span><span>負向 ${Number(event.negativeScore||0)} · ${esc(event.severity||'低')}</span></div><h3>${esc(event.title)}</h3><p>${esc(event.aiSummary||event.excerpt||'')}</p><div class="clue-meta"><span>${esc(event.source||'公開來源')}</span>${url?`<a class="source-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer nofollow">查看來源 ↗</a>`:''}</div></article>`}).join(''):'<div class="pad muted">目前沒有公開線索。</div>'}</div><div class="notice ocr-notice">公開線索僅供決定是否進一步查核，不代表事件屬實。</div><div style="height:14px"></div></section>`;
+    return `<section class="panel"><div class="panel-head"><div><h2>AI 輿情預警時間軸</h2><p>事件線索與示範情境分開標示，須人工查證。</p></div><button onclick="Y.refreshSentiment(${esc(JSON.stringify(id))})">重新分析</button></div><div class="clue-timeline">${events.length?events.map(event=>{const url=event.demo?'':safeUrl(event.url);return `<article class="clue ${event.severity==='高'?'high':''}"><div class="clue-meta"><span>${esc(event.date||'日期不明')}</span><span class="unverified">${event.demo?'虛構示範，非真實事件':'未經查證之公開線索'}</span><span>負向 ${Number(event.negativeScore||0)} · ${esc(event.severity||'低')}</span></div><h3>${esc(event.title)}</h3><p>${esc(event.aiSummary||event.excerpt||'')}</p><div class="clue-meta"><span>${esc(event.source||'公開來源')}</span>${url?`<a class="source-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer nofollow">查看來源 ↗</a>`:''}</div></article>`}).join(''):'<div class="pad muted">目前沒有公開線索。</div>'}</div><div class="notice ocr-notice">公開線索僅供決定是否進一步查核，不代表事件屬實。</div><div style="height:14px"></div></section>`;
   }
   function auditResultPanel(id,forDetail=false){
     const result=db.auditResults[id];if(!result)return '';
