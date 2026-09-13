@@ -449,37 +449,7 @@
       </div>`).join('')}
     </div>`;
 
-    const breakdownPanel = `<div class="panel">
-      <div class="panel-head">
-        <div>
-          <h2>動態分數計算清單</h2>
-          <p>啟用規則總權重 ${round(a.rows.filter(r=>r.enabled).reduce((n,r)=>n+r.weight,0))}%；異動規則開關或門檻將即時動態重算。</p>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table class="score-breakdown">
-          <thead>
-            <tr><th>規則／構面</th><th>權重</th><th>規則狀態</th><th>加權貢獻</th></tr>
-          </thead>
-          <tbody>
-            ${a.rows.map(r=>`<tr>
-              <td>${esc(r.name)}<br><small>${esc(r.dimension)}</small></td>
-              <td>${r.weight}%</td>
-              <td>${!r.enabled?'<span class="muted">已停用</span>':r.raw===null?'待確認':r.hit?'<span class="high">觸發條件</span>':'<span class="low">正常合規</span>'}</td>
-              <td>${!r.enabled?'0 分':r.raw===null?'暫不計入':`${r.contribution>=0?'+':''}${r.contribution} 分`}</td>
-            </tr>`).join('')}
-          </tbody>
-          <tfoot>
-            <tr><td>四構面加權總分</td><td>${activeTotal(db.rules)}%</td><td>資料完整度 ${a.coverage}%</td><td>${s.complete<60?'— (資料不足)':a.score+' 分'}</td></tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>`;
-
-    const shown=db.fields;
-    const fieldsPanel = shown.length ? `<div class="panel"><div class="panel-head"><div><h2>園所資料欄位</h2><p>點擊數值查看來源；缺少的資料標示待補。</p></div></div><div class="table-wrap"><table><thead><tr><th>欄位</th><th>數值</th><th>單位</th></tr></thead><tbody>${shown.map(f=>`<tr><td>${esc(f.name)}</td><td><button class="link" onclick="Y.source(${esc(JSON.stringify(s.id))},'${f.key}')">${esc(display(current(s.id,f.key)?.value))}${records(s.id)[f.key]?.conflict?'（來源衝突）':''}</button></td><td>${esc(f.unit||'—')}</td></tr>`).join('')}</tbody></table></div></div>` : '';
-
-    host.innerHTML = scoreCard + reasonsPanel + breakdownPanel + bedrockAdvicePanel + fieldsPanel;
+    host.innerHTML = scoreCard + reasonsPanel + bedrockAdvicePanel;
     addFunctionHelp();
   };
   function activeTotal(rules){return round(rules.filter(r=>r.enabled).reduce((n,r)=>n+Number(r.weight||0),0));}
