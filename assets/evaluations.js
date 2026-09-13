@@ -25,7 +25,7 @@
   function draw(){
     const all=entries(currentSchool),rows=all.filter(x=>x.year===currentYear).sort((a,b)=>b.date.localeCompare(a.date));
     const years=[...new Set([115,114,113,currentYear,...all.map(x=>x.year)])].sort((a,b)=>b-a);
-    openModal(schoolById(currentSchool).name+' · 年度評鑑資料',`<div class="evaluation-toolbar"><label>評鑑年度 <select aria-label="評鑑年度" onchange="Y.evaluations(${esc(JSON.stringify(currentSchool))},this.value)">${years.map(y=>`<option value="${y}" ${y===currentYear?'selected':''}>${dateLabel(y)}</option>`).join('')}</select></label></div><p class="data-hint">預設顯示最新有紀錄年度。教育部摘要與上傳原始文件分開標示，可切換年度查看。</p><div class="evaluation-list">${rows.map(r=>`<article class="source-card"><h3>${esc(r.title)} <span class="data-status ${r.result==='不符合'||r.result==='待改善'?'conflict':''}">${esc(r.result)}</span></h3><p>${esc(r.date)} · ${r.publicSummary?'教育部公開摘要（非原始文件）':r.demo?'合成示範文件':'本機上傳文件'}</p><small>${esc(r.fileName)}</small><div class="form-actions"><button onclick="Y.viewEvaluation(${esc(JSON.stringify(currentSchool))},'${r.id}')">查看</button><button onclick="Y.downloadEvaluation('${r.id}')">${r.publicSummary?'下載摘要 TXT':'下載評鑑資料'}</button></div></article>`).join('')||'<div class="empty-inline">此年度尚無評鑑資料，可在下方上傳。</div>'}</div><details class="evaluation-upload" open><summary>上傳評鑑資料</summary><form onsubmit="Y.uploadEvaluation(event)"><div class="form-grid" style="margin-top:16px"><label class="field full">文件名稱<input name="title" required maxlength="100" placeholder="例如：年度基本評鑑檢核表"></label><label class="field">民國年度<input name="year" type="number" min="1" max="300" required value="${currentYear}"></label><label class="field">評鑑日期<input name="date" type="date" required min="${currentYear+1911}-01-01" max="${currentYear+1911}-12-31" value="${currentYear+1911}-01-01"></label><label class="field">評鑑結果<select name="result">${options(['符合','待改善','不符合','免檢核','待確認'],'待確認')}</select></label><label class="field full">評鑑文件（最多 10 MB）<input name="file" type="file" required accept=".pdf,.xlsx,.docx,.csv,.txt,.png,.jpg,.jpeg"></label></div><p class="data-hint">只保存於此瀏覽器，不會上傳 AWS。清除網站資料會移除文件。上傳結果保留為年度紀錄；Demo OCR 擷取的事件加分會另列於風險詳情，不覆寫教育部原始摘要。</p><div id="evaluation-error" class="form-error" role="alert"></div><div class="form-actions"><button class="primary" ${busy?'disabled':''}>${busy?'儲存中…':'上傳並保存'}</button></div></form></details>`);
+    openModal(schoolById(currentSchool).name+' · 年度評鑑資料',`<div class="evaluation-toolbar"><label>評鑑年度 <select aria-label="評鑑年度" onchange="Y.evaluations(${esc(JSON.stringify(currentSchool))},this.value)">${years.map(y=>`<option value="${y}" ${y===currentYear?'selected':''}>${dateLabel(y)}</option>`).join('')}</select></label></div><p class="data-hint">預設顯示最新有紀錄年度。教育部摘要與上傳原始文件分開標示，可切換年度查看。</p><div class="evaluation-list">${rows.map(r=>`<article class="source-card"><h3>${esc(r.title)} <span class="data-status ${r.result==='不符合'||r.result==='待改善'?'conflict':''}">${esc(r.result)}</span></h3><p>${esc(r.date)} · ${r.publicSummary?'教育部公開摘要（非原始文件）':r.demo?'合成示範文件':'本機上傳文件'}</p><small>${esc(r.fileName)}</small><div class="form-actions"><button onclick="Y.viewEvaluation(${esc(JSON.stringify(currentSchool))},'${r.id}')">查看</button><button onclick="Y.downloadEvaluation('${r.id}')">${r.publicSummary?'下載摘要 TXT':'下載評鑑資料'}</button>${!r.demo&&!r.publicSummary?`<button type="button" onclick="Y.deleteEvaluation('${r.id}')">刪除</button>`:''}</div></article>`).join('')||'<div class="empty-inline">此年度尚無評鑑資料，可在下方上傳。</div>'}</div><details class="evaluation-upload" open><summary>上傳評鑑資料</summary><form onsubmit="Y.uploadEvaluation(event)"><div class="form-grid" style="margin-top:16px"><label class="field full">文件名稱<input name="title" required maxlength="100" placeholder="例如：年度基本評鑑檢核表"></label><label class="field">民國年度<input name="year" type="number" min="1" max="300" required value="${currentYear}"></label><label class="field">評鑑日期<input name="date" type="date" required min="${currentYear+1911}-01-01" max="${currentYear+1911}-12-31" value="${currentYear+1911}-01-01"></label><label class="field">評鑑結果<select name="result">${options(['符合','待改善','不符合','免檢核','待確認'],'待確認')}</select></label><label class="field full">評鑑文件（最多 10 MB）<input name="file" type="file" required accept=".pdf,.xlsx,.docx,.csv,.txt,.png,.jpg,.jpeg"></label></div><p class="data-hint">只保存於此瀏覽器，不會上傳 AWS。清除網站資料會移除文件。上傳結果保留為年度紀錄；Demo OCR 擷取的事件加分會另列於風險詳情，不覆寫教育部原始摘要。</p><div id="evaluation-error" class="form-error" role="alert"></div><div class="form-actions"><button class="primary" ${busy?'disabled':''}>${busy?'儲存中…':'上傳並保存'}</button></div></form></details>`);
     $('#modal').classList.add('modal-wide');
     const form=$('#modal form');form.elements.year.oninput=()=>{const year=Number(form.elements.year.value)+1911;form.elements.date.min=year+'-01-01';form.elements.date.max=year+'-12-31';};
   }
@@ -38,6 +38,32 @@
     busy=true;f.querySelector('button').disabled=true;fail('');
     try{await storage('readwrite',record.id,file);entries(id).push(record);if(!persist()){db.evaluationFiles[id]=entries(id).filter(x=>x.id!==record.id);await storage('readwrite',record.id);throw Error('本機儲存空間不足，未保存紀錄。');}currentYear=year;busy=false;draw();Y.refreshWork?.();toast('已保存評鑑文件，可切換年度查看或下載');}
     catch(e){fail('保存失敗：'+e.message);}finally{busy=false;if(f.isConnected)f.querySelector('button').disabled=false;}
+  };
+  Y.deleteEvaluation=id=>{
+    const record=entries(currentSchool).find(r=>r.id===id);if(!record||record.demo||record.publicSummary)return;
+    openModal('刪除評鑑文件',`<p>確定刪除「${esc(record.title)}」？</p><p class="muted">原始檔案及這份文件的 OCR 結果會一併移除，其他評鑑紀錄會保留。</p><div id="evaluation-delete-error" class="form-error" role="alert"></div><div class="form-actions"><button onclick="Y.evaluations(${esc(JSON.stringify(currentSchool))},${currentYear})">取消</button><button class="primary" onclick="Y.confirmDeleteEvaluation('${id}',this)">確認刪除</button></div>`);
+  };
+  Y.confirmDeleteEvaluation=async(id,button)=>{
+    if(busy)return;const school=currentSchool,year=currentYear;
+    const record=entries(school).find(r=>r.id===id);if(!record||record.demo||record.publicSummary)return;
+    busy=true;button.disabled=true;
+    const files=structuredClone(db.evaluationFiles[school]),findings=structuredClone(db.ocrFindings?.[school]||[]),impacts=structuredClone(db.externalImpacts?.[school]||[]);
+    let blob;
+    try{
+      blob=await storage('readonly',id);await storage('readwrite',id);
+      db.evaluationFiles[school]=files.filter(r=>r.id!==id);
+      db.ocrFindings||={};db.ocrFindings[school]=findings.filter(r=>r.recordId!==id);
+      const remaining=db.ocrFindings[school].filter(g=>!g.recordId?.startsWith('haishan-demo'));
+      db.externalImpacts||={};db.externalImpacts[school]=impacts.filter(r=>r.id!=='ocr-evaluation');
+      const delta=Math.min(24,Math.max(0,...remaining.flatMap(g=>(g.findings||[]).map(f=>Number(f.riskImpact)||0))));
+      if(delta)db.externalImpacts[school].push({id:'ocr-evaluation',name:'OCR 待覆核證據',dimension:'法遵／裁罰／評鑑',delta,formula:'剩餘文件待覆核；權重0%，不直接計分'});
+      if(!persist())throw Error('無法保存刪除結果');
+      Y.recalculate?.('刪除評鑑文件');busy=false;Y.evaluations(school,year);toast('已刪除評鑑文件及對應 OCR 結果');
+    }catch(error){
+      db.evaluationFiles[school]=files;db.ocrFindings||={};db.ocrFindings[school]=findings;db.externalImpacts||={};db.externalImpacts[school]=impacts;
+      if(blob)try{await storage('readwrite',id,blob)}catch{}
+      const el=document.getElementById('evaluation-delete-error');if(el)el.textContent='刪除失敗：'+error.message;
+    }finally{busy=false;button.disabled=false;}
   };
   Y.downloadEvaluation=async id=>{const record=entries(currentSchool).find(r=>r.id===id);if(!record)return;try{const blob=(record.demo||record.publicSummary)?new Blob([record.text],{type:'text/plain;charset=utf-8'}):await storage('readonly',id);if(!blob)throw Error('找不到本機文件，可能已清除網站資料，請重新上傳。');downloadBlob(blob,record.fileName);}catch(e){toast('下載失敗：'+e.message);}};
   const source=Y.source;Y.source=(id,key)=>key==='evaluationResult'?Y.evaluations(id):source(id,key);

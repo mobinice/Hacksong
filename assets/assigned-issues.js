@@ -6,7 +6,6 @@
   db.ocrFindings ||= {};
   db.sentimentEvents ||= {};
   db.auditResults ||= {};
-  try{indexedDB.deleteDatabase('youan-evaluation-files')}catch{}
 
   const stageNames={待處理:'待查核',調查中:'調查中',待補件:'待補件',已完成:'已結案'};
   const apiPost=async(path,payload)=>{
@@ -161,7 +160,7 @@
     await baseUploadEvaluation(event);
     const record=(db.evaluationFiles?.[id]||[]).filter(r=>!r.demo&&r.fileName===file?.name&&r.year===year).sort((a,b)=>(b.at||'').localeCompare(a.at||''))[0];
     if(!record)return;
-    const analysis=await analyzeEvaluation(file,text);record.aiAnalysis=analysis;applyOcrFinding(id,record.id,analysis);recalculate('評鑑 OCR 與合規檢核更新');
+    const analysis=await analyzeEvaluation(file,text);if(!db.evaluationFiles?.[id]?.some(r=>r.id===record.id))return;record.aiAnalysis=analysis;applyOcrFinding(id,record.id,analysis);recalculate('評鑑 OCR 與合規檢核更新');
     Y.evaluations(id,year);toast(`已擷取 ${analysis.findings.length} 項檢核結果，請人工覆核`);
   };
   const baseViewEvaluation=Y.viewEvaluation;
