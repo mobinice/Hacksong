@@ -468,6 +468,13 @@
   };
   function activeTotal(rules){return round(rules.filter(r=>r.enabled).reduce((n,r)=>n+Number(r.weight||0),0));}
   function syncRiskRecalculate(){ return persist(); }
+  const ruleFields=r=>(required[r.id]||[]).map(key=>({key,...(db.fields.find(f=>f.key===key)||{name:label(key),type:'數字',unit:'',source:'匯入資料'})}));
+  const ruleFormula=r=>({repeat:'近一年裁罰次數依門檻判定，按次累加',eval:'檢查評鑑結果是否為待改善或不符合',staff:'年度人事費 ÷ 實際學生數',growth:'比較人事費年增率與學生數年增率（使用本年、前年度數值）',income:'｜申報收入 − 月收費 × 實際學生數 × 12｜÷ 推估收入 × 100',signals:'（近期訊號數 − 前期基準訊號數）÷ 前期基準訊號數 × 100'}[r.id]||r.condition);
+  Y.ruleField=key=>{
+    const f=db.fields.find(f=>f.key===key);if(!f)return;
+    const used=db.rules.filter(r=>required[r.id]?.includes(key));
+    openModal('使用欄位定義',`<h3>${esc(f.name)}</h3><div class="evidence-block"><small>類型／單位</small><p>${esc(f.type)}／${esc(f.unit||'無')}</p></div><div class="evidence-block"><small>預期資料來源</small><p>${esc(f.source||'尚未設定')}</p></div><div class="evidence-block"><small>使用此欄位的規則</small>${used.map(r=>`<p>${esc(r.name)} · ${r.enabled?'啟用':'停用'} · 權重 ${r.weight}%</p>`).join('')}</div><div class="notice">此定義與欄位管理共用。隱藏詳情欄位不會停用規則；預期來源不代表自動抓取資料。</div><div class="form-actions"><button onclick="closeModal()">返回規則</button><button class="primary" onclick="closeModal();tab='fields';go('settings')">前往欄位管理</button></div>`);
+  };
   rulesPanel=()=>{
     return `<div class="panel">
       <div class="panel-head">
@@ -484,14 +491,15 @@
       <div class="table-wrap">
         <table class="rule-editor">
           <thead>
-            <tr><th>規則名稱／可執行條件</th><th>風險構面</th><th>權重比例</th><th>狀態</th><th>操作</th></tr>
+            <tr><th>規則名稱／可執行條件</th><th>使用欄位（點擊查看定義）</th><th>風險構面</th><th>權重比例</th><th>狀態</th><th>操作</th></tr>
           </thead>
           <tbody>
             ${db.rules.map((r,i)=>`<tr>
               <td>
                 <b>${esc(r.name)}</b>
-                <p class="condition-note">${esc(spec.find(p=>p[0]===r.id)?.[6]||r.condition)}${r.id==='repeat'?'；每次累加':`；門檻 ${display(r.threshold)}`}</p>
+                <p class="condition-note">${esc(ruleFormula(r))}${r.id==='repeat'?'；每次累加':`；門檻 ${display(r.threshold)}`}</p>
               </td>
+              <td>${ruleFields(r).map(f=>`<button type="button" class="link" style="display:block;white-space:nowrap;margin:4px 0" onclick="Y.ruleField('${f.key}')">${esc(f.name)} ↗</button>`).join('')||'<small>尚未設定使用欄位</small>'}</td>
               <td>${esc(r.dimension)}</td>
               <td><div class="rule-controls"><b>${r.weight}%</b><button class="link" onclick="Y.editWeights(${i})">調整</button></div></td>
               <td>
@@ -554,7 +562,9 @@
       <div class="form-grid">
         <label class="field full">規則名稱<input name="name" required maxlength="60" value="${esc(r.name)}"></label>
         <label class="field full">風險構面<select name="dimension">${options(dims,r.dimension)}</select></label>
-        <div class="field full"><span>計算方式</span><div class="formula">${esc(p?.[6]||r.condition)}</div></div>
+        <div class="field full"><span>① 使用欄位（與欄位管理共用）</span><div class="formula">${ruleFields(r).map(f=>esc(f.name)).join(' ＋ ')}</div><small>目前內建規則使用固定欄位；新增自訂欄位不會自動納入計分。</small></div>
+        <div class="field full"><span>② 計算方式</span><div class="formula">${esc(ruleFormula(r))}</div></div>
+        <div class="field full"><span>③ 門檻判定 → ④ 事件加分</span><p>依下方門檻判定；${r.id==='repeat'?'每次裁罰按權重的一半加分，上限為本規則權重':r.id==='eval'?'待改善或不符合時加上本規則權重分數':'符合條件時加上本規則權重分數'}。停用時不加分。</p></div>
         <label class="field">${r.id==='repeat'?'裁罰門檻次數':'比較門檻'}<input name="threshold" type="number" min="0" step="any" required value="${r.threshold}"></label>
         <label class="field">占總分權重（%）<input name="weight" type="number" readonly value="${r.weight}"><small>請使用規則列表的「調整權重」，一次調整合計 100%。</small></label>
       </div>
