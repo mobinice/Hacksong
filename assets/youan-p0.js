@@ -19,6 +19,8 @@
     income:['revenue','tuition','studentCount'],
     signals:['signalCount','signalBaseline']
   };
+  const operatorLabels={gt:'大於',gte:'大於或等於',lt:'小於',lte:'小於或等於',eq:'等於'};
+  const ruleKeys=r=>r.kind==='field-comparison'?[r.fieldKey]:(required[r.id]||[]);
   const newFields = [
     ['schoolId','園所識別碼',['園所識別碼','schoolId']],['year','資料年度',['資料年度','年度','會計年度','year']],
     ['studentCount','實際學生數',['實際學生數','學生數','在園人數','studentCount']],
@@ -64,6 +66,12 @@
   }
   function val(id,key) { const r=records(id)[key]; return r?.conflict ? undefined : current(id,key)?.value; }
   function seed() {
+    for(const key of new Set(Object.values(required).flat())){
+      if(db.fields.some(f=>f.key===key))continue;
+      const money=['staffCost','previousStaffCost','revenue','tuition'].includes(key),text=key==='evaluationResult';
+      db.fields.push({key,name:label(key),type:text?'文字':money?'金額':'數字',unit:text?'':money?'元':key.toLowerCase().includes('student')?'人':'次',source:text?'評鑑資料':money?'財務／收費資料':'園所基本資料與事件紀錄',show:false});
+    }
+
     if(model.seeded)return;
     for(const s of schools.filter(s=>!s.imported)) {
       const n=s.id, count=100+n*3;
@@ -100,7 +108,7 @@
     if(!r.enabled){
       return {ruleId:r.id,name:r.name,dimension:r.dimension,weight:r.weight,threshold:r.threshold,enabled:false,raw:0,contribution:0,hit:false,formula:'規則已停用，不參與計算',observed:'規則已停用',thresholdStr:`門檻 ${display(r.threshold)}`,keys:[],missing:[],action:'規則未啟用'};
     }
-    const keys=required[r.id]||[],v=Object.fromEntries(keys.map(k=>[k,val(s.id,k)]));
+    const keys=ruleKeys(r),v=Object.fromEntries(keys.map(k=>[k,val(s.id,k)]));
     const missing=keys.filter(k=>val(s.id,k)===undefined||val(s.id,k)==='');
     let metric=null,hit=false,formula='',problem='',observed='',thresholdStr='',compare=null;
     if(missing.length){
@@ -187,6 +195,14 @@
           return {ruleId:r.id,name:r.name,dimension:r.dimension,weight:r.weight,threshold:r.threshold,enabled:true,raw:contrib,contribution:contrib,hit,formula,observed,thresholdStr,keys,missing:[],action:spec.find(x=>x[0]===r.id)?.[7]||'查證社群網路通報、媒體報導與家長申訴紀錄真實性'};
         }
         default:
+          if(r.kind==='field-comparison'){
+            const value=Number(v[r.fieldKey]),threshold=Number(r.threshold);
+            if(!Number.isFinite(value)||!Number.isFinite(threshold)){problem='欄位必須是有效數字';break;}
+            const checks={gt:value>threshold,gte:value>=threshold,lt:value<threshold,lte:value<=threshold,eq:value===threshold};
+            if(!(r.operator in checks)){problem='未支援的比較條件';break;}
+            hit=checks[r.operator];const contribution=hit?Number(r.weight):0;
+            return {ruleId:r.id,name:r.name,dimension:r.dimension,weight:r.weight,threshold:r.threshold,enabled:true,raw:contribution,contribution,hit,formula:`${label(r.fieldKey)} ${display(value)} ${operatorLabels[r.operator]} ${display(threshold)}；${hit?'符合':'未符合'}，計 ${contribution} 分`,observed:`${label(r.fieldKey)}：${display(value)}`,thresholdStr:`${operatorLabels[r.operator]} ${display(threshold)}`,keys,missing:[],action:'核對欄位原始資料與人工判斷'};
+          }
           problem = '這條規則尚未設定可執行的計算類型';
       }
     }
@@ -468,11 +484,11 @@
   };
   function activeTotal(rules){return round(rules.filter(r=>r.enabled).reduce((n,r)=>n+Number(r.weight||0),0));}
   function syncRiskRecalculate(){ return persist(); }
-  const ruleFields=r=>(required[r.id]||[]).map(key=>({key,...(db.fields.find(f=>f.key===key)||{name:label(key),type:'數字',unit:'',source:'匯入資料'})}));
-  const ruleFormula=r=>({repeat:'近一年裁罰次數依門檻判定，按次累加',eval:'檢查評鑑結果是否為待改善或不符合',staff:'年度人事費 ÷ 實際學生數',growth:'比較人事費年增率與學生數年增率（使用本年、前年度數值）',income:'｜申報收入 − 月收費 × 實際學生數 × 12｜÷ 推估收入 × 100',signals:'（近期訊號數 − 前期基準訊號數）÷ 前期基準訊號數 × 100'}[r.id]||r.condition);
+  const ruleFields=r=>(ruleKeys(r)).map(key=>({key,...(db.fields.find(f=>f.key===key)||{name:label(key),type:'數字',unit:'',source:'匯入資料'})}));
+  const ruleFormula=r=>r.kind==='field-comparison'?`${label(r.fieldKey)} ${operatorLabels[r.operator]} ${display(r.threshold)}`:({repeat:'近一年裁罰次數依門檻判定，按次累加',eval:'檢查評鑑結果是否為待改善或不符合',staff:'年度人事費 ÷ 實際學生數',growth:'比較人事費年增率與學生數年增率（使用本年、前年度數值）',income:'｜申報收入 − 月收費 × 實際學生數 × 12｜÷ 推估收入 × 100',signals:'（近期訊號數 − 前期基準訊號數）÷ 前期基準訊號數 × 100'}[r.id]||r.condition);
   Y.ruleField=key=>{
     const f=db.fields.find(f=>f.key===key);if(!f)return;
-    const used=db.rules.filter(r=>required[r.id]?.includes(key));
+    const used=db.rules.filter(r=>ruleKeys(r).includes(key));
     openModal('使用欄位定義',`<h3>${esc(f.name)}</h3><div class="evidence-block"><small>類型／單位</small><p>${esc(f.type)}／${esc(f.unit||'無')}</p></div><div class="evidence-block"><small>預期資料來源</small><p>${esc(f.source||'尚未設定')}</p></div><div class="evidence-block"><small>使用此欄位的規則</small>${used.map(r=>`<p>${esc(r.name)} · ${r.enabled?'啟用':'停用'} · 權重 ${r.weight}%</p>`).join('')}</div><div class="notice">此定義與欄位管理共用。隱藏詳情欄位不會停用規則；預期來源不代表自動抓取資料。</div><div class="form-actions"><button onclick="closeModal()">返回規則</button><button class="primary" onclick="closeModal();tab='fields';go('settings')">前往欄位管理</button></div>`);
   };
   rulesPanel=()=>{
@@ -482,7 +498,7 @@
           <h2>風險判斷規則 <span class="pill">版本 1.${db.version}</span></h2>
           <p>設定各規則占總分的比例；開關切換或調整門檻即時動態重算所有園所。</p>
         </div>
-        <div class="toolbar"><button class="primary" onclick="Y.editWeights()">調整權重</button><button onclick="historyModal()">查看修改紀錄</button></div>
+        <div class="toolbar"><button class="primary" onclick="Y.customRule()">＋ 新增風險判斷規則</button><button onclick="Y.editWeights()">調整權重</button><button onclick="historyModal()">查看修改紀錄</button></div>
       </div>
       <div class="rule-total">
         <strong id="weight-total" class="weight-sum">${activeTotal(db.rules)}%</strong>
@@ -556,7 +572,26 @@
     settings();
     toast(`已${r.enabled?'啟用':'停用'}「${r.name}」，已即時動態重算所有園所風險！`);
   };
+  Y.customRule=i=>{
+    const r=i==null?{name:'',fieldKey:'',operator:'gt',threshold:0,weight:5,dimension:dims[0],enabled:true}:db.rules[i];
+    const fields=db.fields.filter(f=>['數字','金額'].includes(f.type));
+    openModal(i==null?'新增風險判斷規則':'編輯自訂風險規則',`<form onsubmit="Y.saveCustomRule(event,${i??'null'})"><div id="custom-rule-error" class="form-error" role="alert"></div><div class="form-grid"><label class="field full">規則名稱<input name="name" required maxlength="60" value="${esc(r.name)}" placeholder="例如：學生數超過指定人數"></label><label class="field full">使用欄位<select name="fieldKey" required>${fields.map(f=>`<option value="${f.key}" ${f.key===r.fieldKey?'selected':''}>${esc(f.name)}（${esc(f.type)}／${esc(f.unit||'無單位')}）</option>`).join('')}</select></label><label class="field">判斷條件<select name="operator">${Object.entries(operatorLabels).map(([k,v])=>`<option value="${k}" ${k===r.operator?'selected':''}>${v}</option>`).join('')}</select></label><label class="field">門檻數值<input name="threshold" type="number" step="any" required value="${r.threshold}"></label><label class="field">風險構面<select name="dimension">${options(dims,r.dimension)}</select></label><label class="field">權重／符合時加分<input name="weight" type="number" min="1" max="100" step="1" required value="${r.weight}" ${i==null?'':'readonly'}></label>${i==null?`<label class="field full">從哪條規則移轉權重<select name="donor" required>${db.rules.filter(x=>x.weight>0).map(x=>`<option value="${x.id}">${esc(x.name)}（目前 ${x.weight}%）</option>`).join('')}</select><small>新增規則會從此規則扣除相同權重，維持全部規則合計100%。</small></label>`:'<small>調整權重請使用列表的「調整權重」。</small>'}</div><label class="check"><input type="checkbox" name="enabled" ${r.enabled?'checked':''}>啟用規則</label><div class="notice">目前支援數字與金額欄位的單欄位比較。符合條件時加上設定分數；資料缺漏或來源衝突時不加分並標示待補。新增欄位需先到欄位管理建立、匯入資料。</div><div class="form-actions"><button type="button" onclick="closeModal()">取消</button><button class="primary">儲存並重算</button></div></form>`);
+  };
+  Y.saveCustomRule=(event,i)=>{
+    event.preventDefault();const v=Object.fromEntries(new FormData(event.target));
+    const f=db.fields.find(f=>f.key===v.fieldKey&&['數字','金額'].includes(f.type)),weight=Number(v.weight),threshold=Number(v.threshold),donor=db.rules.find(r=>r.id===v.donor);
+    const fail=t=>document.getElementById('custom-rule-error').textContent=t;
+    if(!v.name.trim()||!f||!(v.operator in operatorLabels)||!Number.isFinite(threshold)||!Number.isInteger(weight)||weight<1||weight>100)return fail('請確認名稱、欄位、比較條件與數值。');
+    if(i==null&&(!donor||donor.weight<weight))return fail('移轉來源的權重不足，請降低新規則權重或選擇其他來源。');
+    const before=clone(db.rules),version=db.version;
+    const r={id:i==null?'custom-rule-'+uid():db.rules[i].id,kind:'field-comparison',name:v.name.trim(),fieldKey:f.key,operator:v.operator,threshold,weight,dimension:v.dimension,enabled:!!v.enabled,date:isoToday()};
+    if(i==null){donor.weight-=weight;db.rules.push(r);}else db.rules[i]=r;
+    db.version++;recalc('自訂欄位判斷規則更新',true);
+    if(!persist()){db.rules=before;db.version=version;recalc('還原');return fail('儲存失敗，已還原規則。');}
+    closeModal();render();toast('已儲存規則並重新計算所有園所分數');
+  };
   editRule=i=>{
+    if(db.rules[i]?.kind==='field-comparison'){Y.customRule(i);return;}
     const r=db.rules[i],p=spec.find(p=>p[0]===r.id);
     openModal('編輯風險判斷規則',`<form onsubmit="submitRule(event,${i})">
       <div class="form-grid">
@@ -752,7 +787,7 @@
     for(const s of rows){const a=assessment(s),id=`${caseNumber(s.id)}`;data.push([id,s.name,s.district,model.year,...workColumns.map(k=>records(s.id)[k]?.conflict?'來源衝突，待確認':current(s.id,k)?.value??''),a.score,a.coverage,a.anomalies,sourceState(s)==='conflict'?'來源衝突':a.coverage<60?'資料不足':'可評估',a.version]);for(const k of [...new Set(workColumns.flatMap(k=>k==='staffCostPerStudent'?[k,'staffCost','studentCount']:[k]))]){if(k==='staffCostPerStudent'){const c=current(s.id,k);sources.push([id,s.name,model.year,label(k),c?.value??'',c?.source??'',c?.locator??'年度人事費 ÷ 實際學生數',c?.excerpt??'來源缺漏、衝突或學生數無效',c?.at??'',c?'衍生計算':'暫無法計算']);continue;}const r=records(s.id)[k];if(!r){sources.push([id,s.name,model.year,label(k),'','','','','','缺資料']);continue;}for(const c of r.candidates)sources.push([id,s.name,model.year,label(k),c.value,c.source,c.locator,c.excerpt,c.at,r.conflict?'衝突待確認':r.chosen===c.id?'已採用':'保留未採用']);}for(const r of a.rows)scores.push([id,s.name,model.year,r.name,r.dimension,r.weight,r.raw??'資料不足',r.contribution??'暫不計入',r.formula,a.version]);}
     try{downloadBlob(await workbookBlob([{name:'園所資料',rows:data},{name:'來源明細',rows:sources},{name:'評分明細',rows:scores}]),`幼安雷達_園所資料_${model.year}.xlsx`);toast(`已匯出 ${rows.length} 間園所、${workColumns.length} 個欄位與追溯明細`);}catch(e){toast('匯出失敗：'+e.message);}
   };
-  fieldsPanel=()=>`<div class="panel"><div class="panel-head"><div><h2>欄位管理</h2><p>設定自訂匯入欄位與詳情顯示；計分用途由規則自動列出。</p></div><button class="primary" onclick="editField()">＋ 新增資料欄位</button></div><div class="table-wrap"><table><thead><tr><th>欄位名稱</th><th>類型／單位</th><th>預期資料來源</th><th>被哪些規則使用</th><th>詳情顯示</th><th>操作</th></tr></thead><tbody>${db.fields.map((f,i)=>{const used=db.rules.filter(r=>required[r.id]?.includes(f.key));return `<tr><td><b>${esc(f.name)}</b></td><td>${esc(f.type)}／${esc(f.unit||'—')}</td><td>${esc(f.source)}</td><td>${used.length?used.map(r=>`<div>${esc(r.name)} <small>（${r.enabled?'已啟用':'已停用'} · ${r.weight}%）</small></div>`).join(''):'<small>尚無規則使用，不計分</small>'}</td><td><label><input type="checkbox" aria-label="顯示${esc(f.name)}於詳情" ${f.show?'checked':''} onchange="Y.showField(${i},this.checked)"> 顯示</label></td><td><button class="link" onclick="editField(${i})">編輯欄位</button></td></tr>`;}).join('')}</tbody></table></div><div class="pad notice">新增自訂欄位可用於匯入對應、工作台與 Excel 匯出。預期來源只是描述，不會自動抓取；隱藏詳情欄位不會停用評分規則或隱藏判斷證據。</div></div>`;
+  fieldsPanel=()=>`<div class="panel"><div class="panel-head"><div><h2>欄位管理</h2><p>設定自訂匯入欄位與詳情顯示；計分用途由規則自動列出。</p></div><button class="primary" onclick="editField()">＋ 新增資料欄位</button></div><div class="table-wrap"><table><thead><tr><th>欄位名稱</th><th>類型／單位</th><th>預期資料來源</th><th>被哪些規則使用</th><th>詳情顯示</th><th>操作</th></tr></thead><tbody>${db.fields.map((f,i)=>{const used=db.rules.filter(r=>ruleKeys(r).includes(f.key));return `<tr><td><b>${esc(f.name)}</b></td><td>${esc(f.type)}／${esc(f.unit||'—')}</td><td>${esc(f.source)}</td><td>${used.length?used.map(r=>`<div>${esc(r.name)} <small>（${r.enabled?'已啟用':'已停用'} · ${r.weight}%）</small></div>`).join(''):'<small>尚無規則使用，不計分</small>'}</td><td><label><input type="checkbox" aria-label="顯示${esc(f.name)}於詳情" ${f.show?'checked':''} onchange="Y.showField(${i},this.checked)"> 顯示</label></td><td><button class="link" onclick="editField(${i})">編輯欄位</button></td></tr>`;}).join('')}</tbody></table></div><div class="pad notice">新增自訂欄位可用於匯入對應、工作台與 Excel 匯出。預期來源只是描述，不會自動抓取；隱藏詳情欄位不會停用評分規則或隱藏判斷證據。</div></div>`;
   Y.showField=(i,on)=>{const previous=db.fields[i].show;db.fields[i].show=on;if(!persist())db.fields[i].show=previous;settings();};
   editField=i=>{const f=i==null?{name:'',type:'數字',unit:'',source:'',show:true}:db.fields[i];const builtIn=f.key&&!f.key.startsWith('custom_');openModal(i==null?'新增資料欄位':'編輯資料欄位',`<form onsubmit="submitField(event,${i??'null'})"><div id="form-error" class="form-error" role="alert"></div><div class="form-grid"><label class="field full">欄位名稱<input name="name" required maxlength="40" value="${esc(f.name)}" ${builtIn?'readonly':''}></label><label class="field">欄位類型<select name="type" ${builtIn?'disabled':''}>${options(['數字','金額','文字','日期','是／否'],f.type)}</select></label><label class="field">單位<input name="unit" maxlength="12" value="${esc(f.unit)}"></label><label class="field full">預期資料來源<input name="source" maxlength="100" value="${esc(f.source)}" placeholder="例如：園所提供的年度資料"></label></div><label class="check"><input type="checkbox" name="show" ${f.show?'checked':''}>顯示於園所詳情的資料欄位區</label><div class="notice">${builtIn?'內建欄位名稱與型別固定，以維持來源對應與計分一致。':'新增欄位不會自動納入風險計算，需另建立對應的可執行規則。'}</div><div class="form-actions"><button type="button" onclick="closeModal()">取消</button><button class="primary">儲存欄位</button></div></form>`);};
   submitField=(e,i)=>{e.preventDefault();const v=Object.fromEntries(new FormData(e.target)),old=i==null?null:db.fields[i],builtIn=old&&!old.key.startsWith('custom_'),name=builtIn?old.name:v.name.trim();if(!name||db.fields.some((f,j)=>j!==i&&f.name===name)){ $('#form-error').textContent='請填寫不重複的欄位名稱。';return;}const f={...old,key:old?.key||'custom_'+uid().replaceAll('-',''),name,type:builtIn?old.type:v.type,unit:v.unit.trim(),source:v.source.trim(),show:!!v.show};if(i==null)db.fields.push(f);else db.fields[i]=f;if(!persist()){if(i==null)db.fields.pop();else db.fields[i]=old;$('#form-error').textContent='無法保存欄位，請檢查本機儲存空間。';return;}const pos=numericImportFields.indexOf(f.key);if(['數字','金額'].includes(f.type)){if(pos<0)numericImportFields.push(f.key);}else if(pos>=0)numericImportFields.splice(pos,1);closeModal();settings();toast('已儲存欄位，詳情顯示設定已生效');};
