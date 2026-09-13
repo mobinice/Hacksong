@@ -172,7 +172,7 @@
     if(!analysis&&record?.demo){analysis=demoOcr(record.text||'待改善 改善事項 設施設備維護',record.fileName);record.aiAnalysis=analysis;applyOcrFinding(schoolId,recordId,analysis);}
     if(!analysis){baseViewEvaluation(schoolId,recordId);return;}
     const viewer=document.getElementById('evaluation-checklist');
-    viewer.innerHTML=`<div class="dialog-head"><div><h2 id="checklist-title">評鑑 OCR 與合規檢核</h2><small>${esc(schoolById(schoolId).name)} · ${esc(record?.title||analysis.document)}</small></div><button aria-label="關閉" onclick="document.getElementById('evaluation-checklist').close()">×</button></div><div class="dialog-body"><div class="ai-banner"><div><strong>${esc(analysis.provider||'Demo OCR')}</strong><p>${esc(analysis.notice||'結果待人工覆核。')}</p></div><span class="pill">Demo AI</span></div>${record?.text?`<details><summary>查看文件原文</summary><pre style="white-space:pre-wrap">${esc(record.text)}</pre></details>`:''}<div class="finding-list">${analysis.findings.map(f=>`<article class="finding ${Number(f.riskImpact)>=20?'high':''}"><h3>${esc(f.category)}</h3><p>${esc(f.summary)}</p><footer><span>${esc(f.clause)}</span><span>風險影響 +${Number(f.riskImpact||0)} 分</span><span>${esc(f.evidence)}</span></footer></article>`).join('')}</div><div class="notice">法規對照為 Demo 輔助結果；承辦人仍須核對原始文件、適用日期與完整條文。</div></div>`;
+    viewer.innerHTML=`<div class="dialog-head"><div><h2 id="checklist-title">評鑑 OCR 與合規檢核</h2><small>${esc(schoolById(schoolId).name)} · ${esc(record?.title||analysis.document)}</small></div><button aria-label="關閉" onclick="document.getElementById('evaluation-checklist').close()">×</button></div><div class="dialog-body"><div class="ai-banner"><div><strong>${esc(analysis.provider||'Demo OCR')}</strong><p>${esc(analysis.notice||'結果待人工覆核。')}</p></div><span class="pill">Demo AI</span></div>${record?.text?`<details><summary>查看文件原文</summary><pre style="white-space:pre-wrap">${esc(record.text)}</pre></details>`:''}<div class="finding-list">${analysis.findings.map(f=>`<article class="finding ${Number(f.riskImpact)>=20?'high':''}"><h3>${esc(f.category)}</h3><p>${esc(f.summary)}</p><footer><span>${esc(f.clause)}</span><span>待覆核提示 ${Number(f.riskImpact||0)} · 實際加分 0 分</span><span>${esc(f.evidence)}</span></footer></article>`).join('')}</div><div class="notice">法規對照為 Demo 輔助結果；承辦人仍須核對原始文件、適用日期與完整條文。</div></div>`;
     viewer.showModal();
   };
 
@@ -216,7 +216,7 @@
         {category:'【示範】餐飲紀錄',summary:'模擬辨識：餐點留樣紀錄待補充，建議查閱原始紀錄。',evidence:'第2頁：餐點留樣紀錄待補充',riskImpact:16},
         {category:'【示範】改善追蹤',summary:'模擬辨識：改善事項待人工確認與追蹤。',evidence:'第3頁：改善事項列入追蹤',riskImpact:12}
       ].map(f=>({...f,clause:'示範檢核項目；適用法規待承辦人核對',verified:false}));
-      const analysis={demo:true,provider:'預先建立的虛構 Demo OCR',document:'海山_OCR操作示例_非官方.txt',findings,notice:'全部內容為虛構，不代表海山附幼存在任何缺失。單項影響供展示，本文件取最高18分，不逐項相加。'};
+      const analysis={demo:true,provider:'預先建立的虛構 Demo OCR',document:'海山_OCR操作示例_非官方.txt',findings,notice:'全部內容為虛構，不代表海山附幼存在任何缺失。提示值僅供示範，OCR權重0%，不直接計入總分。'};
       db.evaluationFiles[id].push({id:recordId,year:115,date:'2026-09-12',title:'【虛構示範】評鑑 OCR 檢核文件',result:'待確認',demo:true,fileName:analysis.document,text,aiAnalysis:analysis});
       db.ocrFindings[id].push({recordId,at:stamp(),...analysis});
       setImpact(id,{id:'haishan-demo-ocr',name:'【虛構示範】OCR 文件待覆核',dimension:'法遵／裁罰／評鑑',delta:18,formula:'虛構OCR三項結果取最高18分，不累加；非官方評分',action:'開啟示範文件，核對原文與待確認事項'});
@@ -235,7 +235,7 @@
 
   function ocrPanel(id){
     const groups=db.ocrFindings[id]||[],findings=groups.flatMap(group=>group.findings||[]);
-    return `<section class="panel"><div class="panel-head"><div><h2>評鑑 OCR 與合規檢核</h2><p>從文件擷取待改善事項，連回可能適用的法規。</p></div><button onclick="Y.evaluations(${esc(JSON.stringify(id))})">查看／上傳文件</button></div>${findings.length?`<div class="finding-list">${findings.slice(0,4).map(f=>`<article class="finding ${Number(f.riskImpact)>=20?'high':''}"><h3>${esc(f.category)}</h3><p>${esc(f.summary)}</p><footer><span>${esc(f.clause)}</span><span>風險影響 +${Number(f.riskImpact||0)} 分</span></footer></article>`).join('')}</div>`:'<div class="pad muted">尚無 OCR 擷取結果，可上傳評鑑文件開始分析。</div>'}<div class="notice ocr-notice">Demo AI 輔助結果，須核對原始文件與完整法規。</div><div style="height:14px"></div></section>`;
+    return `<section class="panel"><div class="panel-head"><div><h2>評鑑 OCR 與合規檢核</h2><p>從文件擷取待改善事項，連回可能適用的法規。</p></div><button onclick="Y.evaluations(${esc(JSON.stringify(id))})">查看／上傳文件</button></div>${findings.length?`<div class="finding-list">${findings.slice(0,4).map(f=>`<article class="finding ${Number(f.riskImpact)>=20?'high':''}"><h3>${esc(f.category)}</h3><p>${esc(f.summary)}</p><footer><span>${esc(f.clause)}</span><span>待覆核提示 ${Number(f.riskImpact||0)} · 實際加分 0 分</span></footer></article>`).join('')}</div>`:'<div class="pad muted">尚無 OCR 擷取結果，可上傳評鑑文件開始分析。</div>'}<div class="notice ocr-notice">OCR 僅為待覆核證據，權重 0%，不直接加分。須核對原始文件與完整法規。</div><div style="height:14px"></div></section>`;
   }
   function sentimentPanel(id){
     const events=db.sentimentEvents[id]||[];
