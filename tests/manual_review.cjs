@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+let saves=true;const c={Y:{},db:{reviews:{},casework:{},profile:{}},structuredClone,schoolById:id=>id==='REAL-T'?{id,name:'測試園'}:null,stamp:()=> '2026/9/13 10:00',loginState:()=> '測試操作者',uid:()=> 'event',persist:()=>saves,auditPage(){},casePage(){},saveReview(){},ensureCase(id){return c.db.casework[id]||=( {actions:[],timeline:[],owner:c.db.reviews[id]?.owner||''});}};
+vm.createContext(c);vm.runInContext(fs.readFileSync('assets/review-management.js','utf8'),c);
+const write=c.Y.writeManualReview,form={status:'持續觀察',owner:'承辦甲',date:'',note:'初次',next:''};
+assert.equal(write('REAL-T',form),true);assert.equal(c.db.casework['REAL-T'].timeline[0].operation,'新增');
+write('REAL-T',{...form,note:'修改後'});let log=c.db.casework['REAL-T'].timeline[0];assert.equal(log.before.note,'初次');assert.equal(log.after.note,'修改後');assert.equal(log.actor,'測試操作者');
+assert.equal(write('REAL-T',{...form,note:'修改後'}),false);assert.equal(c.db.casework['REAL-T'].timeline.length,2);
+c.db.casework['REAL-T'].actions.push({title:'保留調查'});write('REAL-T',null);assert.equal(c.db.reviews['REAL-T'].saved,undefined);assert.ok(c.db.reviews['REAL-T'].deletedAt);assert.equal(c.db.casework['REAL-T'].actions.length,1);assert.equal(c.db.casework['REAL-T'].timeline[0].before.note,'修改後');
+assert.equal(({...{'REAL-T':{saved:'old'}},...c.db.reviews})['REAL-T'].saved,undefined);
+write('REAL-T',form);assert.equal(c.db.casework['REAL-T'].timeline[0].operation,'新增');
+saves=false;const before=JSON.stringify(c.db);assert.throws(()=>write('REAL-T',null),/儲存失敗/);assert.equal(JSON.stringify(c.db),before);
+assert.throws(()=>write('REAL-T',{...form,owner:'  '}),/承辦人/);
+console.log('Manual review CRUD, snapshots, no-op, retained actions, deletion merge, rollback and validation passed');
